@@ -5,9 +5,16 @@ const mongoose = require('mongoose');
 const path = require('path');
 
 // Load environment variables
+const fs = require('fs');
 dotenv.config();
 
 const app = express();
+
+// Ensure uploads directory exists
+const uploadPath = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath);
+}
 
 // Middleware
 app.use(cors());
