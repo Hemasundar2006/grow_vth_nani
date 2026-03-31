@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.vercel
+package-lock.json
+build
+.DS_Store
+frontend/node_modules
+frontend/dist
+backend/node_modules
+backend/uploads
