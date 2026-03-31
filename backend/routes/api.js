@@ -9,7 +9,9 @@ const {
   recordClick,
   recordShare,
   getPublicProfileLinks,
-  getPersonalProfile
+  getPersonalProfile,
+  subscribe,
+  getLeads
 } = require('../controllers/linkController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
@@ -37,5 +39,7 @@ router.get('/public/personal', getPersonalProfile);
 router.get('/public/profile/:username', getPublicProfileLinks);
 router.get('/public/link/:id/click', recordClick);
 router.get('/public/link/:id/share', recordShare);
+router.post('/public/subscribe', subscribe);
+router.get('/admin/leads', protect, getLeads);
 
 module.exports = router;

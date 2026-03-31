@@ -15,11 +15,15 @@ import {
   Save,
   Palette,
   Zap,
-  LayoutDashboard,
-  LineChart,
-  Calendar,
+  BarChart3,
+  Globe,
+  Layout,
+  MessageSquare,
   X,
-  Share2
+  ChevronRight,
+  TrendingUp,
+  Share2,
+  PlayCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -34,18 +38,10 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
 
   const [linkForm, setLinkForm] = useState({
-    title: '',
-    url: '',
-    buttonText: 'Visit',
-    status: 'published',
-    type: 'link',
-    startDate: null,
-    expiryDate: null
+    title: '', url: '', buttonText: 'Visit', status: 'published', type: 'link', startDate: null, expiryDate: null
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
@@ -56,17 +52,10 @@ const AdminDashboard = () => {
       setLinks(linksRes.data);
       setProfile(profileRes.data);
     } catch (error) {
-      toast.error('Failed to load dashboard data');
+      toast.error('Data retrieval failed');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    toast.success('Logged out');
-    navigate('/login');
   };
 
   const handleCreateOrUpdateLink = async (e) => {
@@ -74,28 +63,28 @@ const AdminDashboard = () => {
     try {
       if (editingLink) {
         await api.put(`/admin/links/${editingLink._id}`, linkForm);
-        toast.success('Link updated');
+        toast.success('Protocol refined');
       } else {
         await api.post('/admin/links', linkForm);
-        toast.success('Link created');
+        toast.success('Content launched');
       }
       setShowForm(false);
       setEditingLink(null);
       setLinkForm({ title: '', url: '', buttonText: 'Visit', status: 'published', type: 'link', startDate: null, expiryDate: null });
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Action failed');
+      toast.error(error.response?.data?.message || 'Protocol failure');
     }
   };
 
   const handleDeleteLink = async (id) => {
-    if (window.confirm('Delete this link?')) {
+    if (window.confirm('Wipe this asset?')) {
       try {
         await api.delete(`/admin/links/${id}`);
-        toast.success('Link deleted');
+        toast.success('Asset wiped');
         fetchData();
       } catch (error) {
-        toast.error('Failed to delete');
+        toast.error('Wipe failed');
       }
     }
   };
@@ -104,294 +93,214 @@ const AdminDashboard = () => {
     e.preventDefault();
     try {
       await api.put('/auth/profile', profile);
-      toast.success('Profile updated');
+      toast.success('Identity locked');
     } catch (error) {
-      toast.error('Failed to update profile');
+      toast.error('Identity sync failed');
     }
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-white font-inter">
-      <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-950 font-inter">
+      <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
     </div>
   );
 
-  const totalClicksArray = links.map(l => l.clickCount || 0);
-  const totalSharesArray = links.map(l => l.shareCount || 0);
-  const totalClicks = totalClicksArray.reduce((p, c) => p + c, 0);
-  const totalShares = totalSharesArray.reduce((p, c) => p + c, 0);
+  const totalClicks = links.reduce((p, c) => p + (c.clickCount || 0), 0);
+  const totalShares = links.reduce((p, c) => p + (c.shareCount || 0), 0);
+
+  const stats = [
+    { label: 'Global Reach', value: totalClicks, icon: TrendingUp, color: 'text-indigo-500' },
+    { label: 'Cloud Shares', value: totalShares, icon: Share2, color: 'text-purple-500' },
+    { label: 'Asset Count', value: links.length, icon: Layout, color: 'text-blue-500' }
+  ];
 
   return (
-    <div className="min-h-screen bg-[#fcfcfc] pb-24 font-inter">
-      {/* MOBILE PREMIUM HEADER */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-6 py-5">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-[1.2rem] flex items-center justify-center shadow-lg shadow-indigo-100">
-             <Zap size={18} className="text-white" fill="white" />
-          </div>
-          <div>
-             <h1 className="text-[14px] font-black uppercase tracking-tighter italic leading-none">Admin Panel</h1>
-             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">vth_nani ecosystem</p>
-          </div>
-        </div>
-        <div className="flex items-center space-x-2">
-           <button onClick={() => window.open(`/`, '_blank')} className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-indigo-600 transition-colors">
-              <Eye size={20} />
-           </button>
-           <button onClick={handleLogout} className="p-3 bg-red-50 rounded-2xl text-red-400 hover:bg-red-100 transition-all">
-              <LogOut size={20} />
-           </button>
-        </div>
-      </header>
-
-      {/* ANALYTICS SUMMARY BOX */}
-      <div className="px-6 pt-8 grid grid-cols-2 gap-4">
-         <div className="bg-indigo-600 p-6 rounded-[2.5rem] shadow-xl shadow-indigo-100 text-white relative overflow-hidden group">
-            <LineChart className="absolute -right-4 -bottom-4 text-white/10 w-24 h-24 group-hover:scale-110 transition-transform" />
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Total Visibility</p>
-            <h3 className="text-3xl font-black italic">{totalClicks}</h3>
-            <p className="text-[9px] font-bold mt-1 opacity-70 italic tracking-tight">Active link interactions</p>
+    <div className="min-h-screen bg-[#0a0a0c] text-white font-inter flex flex-col md:flex-row">
+      
+      {/* SIDEBAR (DESKTOP) */}
+      <aside className="hidden md:flex w-72 bg-[#111114] border-r border-white/5 flex-col p-8 space-y-10">
+         <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-2xl shadow-indigo-500/20"><Zap size={20} fill="white" /></div>
+            <span className="font-black text-xs uppercase tracking-[0.3em] italic text-indigo-100">vth_protocol</span>
          </div>
-         <div className="bg-white border border-gray-100 p-6 rounded-[2.5rem] shadow-sm relative overflow-hidden">
-            <Share2 className="absolute -right-4 -bottom-4 text-indigo-50 w-24 h-24" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Social Shares</p>
-            <h3 className="text-3xl font-black italic text-gray-900">{totalShares}</h3>
-            <p className="text-[9px] font-bold mt-1 text-indigo-400 italic tracking-tight">Community referrals</p>
+         <nav className="flex-1 space-y-4">
+            {[
+              { id: 'links', label: 'Feed Stream', icon: Layout },
+              { id: 'profile', label: 'Identity', icon: UserIcon },
+              { id: 'theme', label: 'Aesthetic', icon: Palette },
+              { id: 'analytics', label: 'Data Bank', icon: BarChart3 }
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center p-4 rounded-2xl transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
+                <tab.icon size={20} className="mr-4" /><span className="font-black text-[10px] uppercase tracking-widest">{tab.label}</span>
+              </button>
+            ))}
+         </nav>
+         <div className="pt-8 border-t border-white/5 space-y-4">
+            <button onClick={() => window.open('/', '_blank')} className="w-full flex items-center p-4 text-gray-400 hover:text-white transition-all bg-white/5 rounded-2xl"><Eye size={18} className="mr-4" /><span className="font-bold text-[10px] uppercase tracking-widest">Live Page</span></button>
+            <button onClick={() => { localStorage.clear(); navigate('/login'); }} className="w-full flex items-center p-4 text-red-500 hover:bg-red-500/10 rounded-2xl"><LogOut size={18} className="mr-4" /><span className="font-bold text-[10px] uppercase tracking-widest">Disconnect</span></button>
+         </div>
+      </aside>
+
+      {/* NEW PREMIUM HEADER (EXPOSED ACTIONS) */}
+      <div className="sticky top-0 z-[1000] flex flex-col w-full bg-[#111114]/80 backdrop-blur-3xl border-b border-white/5 md:bg-transparent md:border-none">
+         <div className="flex items-center justify-between p-6 md:p-14 md:pb-0">
+            <div className="flex items-center space-x-3">
+               <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-xl shadow-indigo-600/30 md:hidden"><Zap size={20} fill="white" /></div>
+               <div>
+                  <h1 className="text-[13px] font-black uppercase tracking-[0.4em] text-gray-500 mb-1">Command Center</h1>
+                  <div className="flex items-center space-x-3">
+                     <span className="text-xl font-black italic tracking-tight">{profile.creatorName || 'vth_nani'}</span>
+                     <div className="px-3 py-1 bg-indigo-500/10 rounded-full border border-indigo-500/20 flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-green-500/50 shadow-sm"></div>
+                        <span className="text-[8px] font-black uppercase text-indigo-400 tracking-widest">vth_internal</span>
+                     </div>
+                  </div>
+               </div>
+            </div>
+            <div className="flex items-center space-x-4">
+               <button onClick={() => window.open('/', '_blank')} className="w-11 h-11 bg-white/5 rounded-xl flex items-center justify-center text-gray-400 hover:text-white transition-all border border-white/5"><Eye size={20} /></button>
+               <button onClick={() => { localStorage.clear(); navigate('/login'); }} className="w-11 h-11 bg-red-500/5 rounded-xl flex items-center justify-center text-red-500 hover:bg-red-500/10 transition-all border border-red-500/10"><LogOut size={20} /></button>
+            </div>
+         </div>
+         
+         {/* SUB-NAV IN HEADER FOR MOBILE FAST-ACCESS */}
+         <div className="md:hidden flex items-center space-x-6 px-6 py-4 overflow-x-auto no-scrollbar border-t border-white/5 bg-white/5">
+            {[
+              { id: 'links', label: 'Feed', icon: Layout },
+              { id: 'profile', label: 'Identity', icon: UserIcon },
+              { id: 'theme', label: 'Aesthetics', icon: Palette }
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center space-x-2 whitespace-nowrap p-2 rounded-lg transition-all ${activeTab === tab.id ? 'text-indigo-400' : 'text-gray-500'}`}>
+                <tab.icon size={16} />
+                <span className="text-[9px] font-black uppercase tracking-widest">{tab.label}</span>
+              </button>
+            ))}
          </div>
       </div>
 
-      <main className="px-6 mt-8">
-        <AnimatePresence mode="wait">
-          {activeTab === 'links' && (
-            <motion.div key="links" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-               <div className="flex items-center justify-between mb-6 pl-1">
-                  <h2 className="text-[12px] font-black uppercase tracking-[0.3em] text-gray-400">Content Stream</h2>
-                  <span className="text-[10px] font-black text-indigo-600 uppercase bg-indigo-50 px-3 py-1 rounded-full">{links.length} Active Items</span>
-               </div>
+      <main className="flex-1 overflow-y-auto h-screen p-6 md:p-14 space-y-12 no-scrollbar md:pt-14">
+         
+         {/* STATS ENGINE */}
+         <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {stats.map((s, i) => (
+              <div key={i} className="bg-[#111114] p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
+                 <s.icon className={`absolute -right-6 -bottom-6 w-24 h-24 opacity-5 ${s.color}`} /><p className="text-[9px] font-black uppercase tracking-[0.25em] text-gray-500 mb-2">{s.label}</p><h3 className="text-4xl font-black italic">{s.value}</h3>
+              </div>
+            ))}
+         </section>
 
-               <div className="space-y-4">
-                  {links.map((link) => (
-                    <div key={link._id} className="bg-white p-5 rounded-[2.5rem] border border-gray-50 shadow-sm flex items-center justify-between group">
-                       <div className="flex items-center space-x-4">
-                          <div className={`w-14 h-14 rounded-[1.5rem] flex items-center justify-center ${link.type === 'video' ? 'bg-red-50 text-red-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                             {link.type === 'video' ? <PlayCircle size={24} /> : <LinkIcon size={24} />}
-                          </div>
-                          <div className="max-w-[150px]">
-                             <h4 className="font-black text-sm uppercase tracking-tight text-gray-900 truncate">{link.title}</h4>
-                             <div className="flex items-center space-x-3 mt-1.5 grayscale opacity-60">
-                                <div className="flex items-center space-x-1">
-                                   <Eye size={10} /> <span className="text-[9px] font-black">{link.clickCount || 0}</span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                   <Share2 size={10} /> <span className="text-[9px] font-black">{link.shareCount || 0}</span>
-                                </div>
-                             </div>
-                          </div>
-                       </div>
-                       <div className="flex items-center space-x-2">
-                          <button onClick={() => { setEditingLink(link); setLinkForm(link); setShowForm(true); }} className="w-10 h-10 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDeleteLink(link._id)} className="w-10 h-10 bg-red-50 rounded-2xl flex items-center justify-center text-red-400"><Trash2 size={16} /></button>
-                       </div>
-                    </div>
-                  ))}
+         <AnimatePresence mode="wait">
+            {activeTab === 'links' && (
+              <motion.div key="links" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                 <div className="flex items-center justify-between mb-8">
+                    <h2 className="text-[13px] font-black uppercase tracking-[0.4em] text-gray-500">Asset Stream</h2>
+                    <button onClick={() => { setEditingLink(null); setShowForm(true); }} className="bg-indigo-600 text-white font-black uppercase text-[10px] px-8 py-4 rounded-2xl shadow-xl shadow-indigo-600/20 flex items-center space-x-3"><Plus size={16} /><span>Launch Content</span></button>
+                 </div>
+                 <div className="grid grid-cols-1 gap-4">
+                    {links.map(link => (
+                      <div key={link._id} className="bg-[#111114] p-6 rounded-[2.5rem] border border-white/5 flex items-center justify-between group hover:border-indigo-500/30 transition-all">
+                         <div className="flex items-center space-x-6">
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${link.type === 'video' ? 'bg-red-500/10 text-red-500' : 'bg-indigo-500/10 text-indigo-500'}`}>{link.type === 'video' ? <PlayCircle size={24} /> : <LinkIcon size={24} />}</div>
+                            <div><h4 className="font-black text-[11px] uppercase tracking-wider">{link.title}</h4><div className="flex items-center space-x-4 mt-2"><div className="flex items-center text-[10px] space-x-1.5 text-gray-500"><Eye size={12} className="text-indigo-400" /> <span>{link.clickCount || 0}</span></div><div className="flex items-center text-[10px] space-x-1.5 text-gray-500"><Share2 size={12} className="text-purple-400" /> <span>{link.shareCount || 0}</span></div></div></div>
+                         </div>
+                         <div className="flex space-x-2">
+                            <button onClick={() => { setEditingLink(link); setLinkForm(link); setShowForm(true); }} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-gray-400 hover:text-indigo-500 transition-colors"><Edit2 size={16} /></button>
+                            <button onClick={() => handleDeleteLink(link._id)} className="w-10 h-10 bg-red-500/5 rounded-xl flex items-center justify-center text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 size={16} /></button>
+                         </div>
+                      </div>
+                    ))}
+                 </div>
+              </motion.div>
+            )}
 
-                  {links.length === 0 && (
-                    <div className="text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
-                       <LinkIcon className="mx-auto mb-4 text-gray-200" size={48} />
-                       <h3 className="text-sm font-black text-gray-900 uppercase">Nothing to show yet</h3>
-                       <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mt-2 px-12">Start by adding your first masterpiece using the + button below</p>
-                    </div>
-                  )}
-               </div>
-            </motion.div>
-          )}
+            {activeTab === 'profile' && (
+               <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="max-w-2xl">
+                   <h2 className="text-[13px] font-black uppercase tracking-[0.45em] text-gray-500 mb-8">Identity Config</h2>
+                   <form onSubmit={handleUpdateProfile} className="bg-[#111114] p-10 rounded-[3rem] border border-white/5 space-y-10 shadow-2xl">
+                      <div className="flex flex-col items-center">
+                         <div className="w-32 h-32 rounded-full border-4 border-white/10 ring-[12px] ring-indigo-500/5 relative mb-6">
+                            {profile.profilePicture ? ( <img src={profile.profilePicture} className="w-full h-full object-cover rounded-full" alt="P" /> ) : ( <div className="w-full h-full flex items-center justify-center font-black italic text-4xl text-gray-700 uppercase">{profile.username?.[0]}</div> )}
+                         </div>
+                         <input type="file" id="pfp" className="hidden" accept="image/*" onChange={async (e) => {
+                            const file = e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append('image', file);
+                            const { data } = await api.post('/upload', fd); setProfile({...profile, profilePicture: data.url}); toast.success('Portrait Captured');
+                         }} />
+                         <label htmlFor="pfp" className="bg-indigo-600 px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-pointer active:scale-95 transition-all shadow-xl shadow-indigo-600/20">Change Portrait</label>
+                      </div>
+                      <div className="grid grid-cols-1 gap-8">
+                         <div className="space-y-1.5"><label className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-600 ml-1">Universal Handle</label><input className="w-full p-5 bg-[#0a0a0c] border border-white/5 rounded-2xl outline-none focus:border-indigo-500 font-bold" value={profile.creatorName || ''} onChange={(e) => setProfile({...profile, creatorName: e.target.value})} /></div>
+                         <div className="space-y-1.5"><label className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-600 ml-1">Mantra Core</label><textarea className="w-full p-5 bg-[#0a0a0c] border border-white/5 rounded-2xl outline-none focus:border-indigo-500 font-bold h-32" value={profile.bio || ''} onChange={(e) => setProfile({...profile, bio: e.target.value})} /></div>
+                         <div className="grid grid-cols-2 gap-6">
+                            {['instagram', 'youtube'].map(plat => (
+                               <div key={plat} className="space-y-1.5"><label className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-600 ml-1">{plat} Entry</label><input className="w-full p-4 bg-[#0a0a0c] border border-white/5 rounded-2xl outline-none focus:border-indigo-500 font-bold text-xs" value={profile.socialLinks?.[plat] || ''} onChange={(e) => setProfile({...profile, socialLinks: {...profile.socialLinks, [plat]: e.target.value}})} /></div>
+                            ))}
+                         </div>
+                      </div>
+                      <button className="w-full bg-indigo-600 p-5 rounded-[2rem] font-black text-[11px] uppercase tracking-widest flex items-center justify-center space-x-3 shadow-2xl shadow-indigo-600/20">
+                         <Save size={18} /> <span>Lock Identity</span>
+                      </button>
+                   </form>
+               </motion.div>
+            )}
 
-          {activeTab === 'profile' && (
-            <motion.div key="profile" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-               <h2 className="text-[12px] font-black uppercase tracking-[0.3em] text-gray-400 mb-6 pl-1">Identity & Bio</h2>
-               <form onSubmit={handleUpdateProfile} className="bg-white p-8 rounded-[3rem] border border-gray-50 space-y-8 shadow-sm">
-                  <div className="flex flex-col items-center">
-                    <div className="w-28 h-28 rounded-full bg-gray-50 mb-5 relative group overflow-hidden border-4 border-white shadow-xl ring-8 ring-indigo-50">
-                      {profile.profilePicture ? (
-                        <img src={profile.profilePicture} alt="Profile" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-200 font-bold text-4xl italic">G</div>
-                      )}
-                    </div>
-                    <input type="file" id="pfp" className="hidden" accept="image/*" onChange={async (e) => {
-                       const file = e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append('image', file);
-                       try { const { data } = await api.post('/upload', fd); setProfile({ ...profile, profilePicture: data.url }); toast.success('Portrait Updated');
-                       } catch (err) { toast.error('Upload failed'); }
-                    }}/>
-                    <label htmlFor="pfp" className="bg-indigo-600 text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-2xl shadow-xl shadow-indigo-100 cursor-pointer hover:scale-105 transition-transform">Update Portrait</label>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                       <label className="text-[9px] font-black uppercase tracking-widest text-gray-300 ml-1">Creator Handle</label>
-                       <input className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold" value={profile.creatorName || ''} onChange={(e) => setProfile({ ...profile, creatorName: e.target.value })}/>
-                    </div>
-                    <div className="space-y-1">
-                       <label className="text-[9px] font-black uppercase tracking-widest text-gray-300 ml-1">The Mantra</label>
-                       <textarea className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold h-24" value={profile.bio || ''} onChange={(e) => setProfile({ ...profile, bio: e.target.value })}/>
-                    </div>
-                  </div>
-
-                  <button className="w-full bg-indigo-600 text-white font-black uppercase text-[12px] p-5 rounded-[2rem] shadow-xl shadow-indigo-100 flex items-center justify-center space-x-3">
-                     <Save size={18} /> <span>Save Profile</span>
-                  </button>
-               </form>
-            </motion.div>
-          )}
-
-          {activeTab === 'theme' && (
-            <motion.div key="theme" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-               <h2 className="text-[12px] font-black uppercase tracking-[0.4em] text-gray-400 mb-6 pl-1">The Aesthetic</h2>
-               <div className="bg-white p-8 rounded-[3rem] border border-gray-50 space-y-8 shadow-sm">
-                  <div className="space-y-6">
-                     <div className="flex items-center justify-between">
-                        <div>
-                           <h4 className="text-[11px] font-black uppercase tracking-widest text-gray-900">Background Canvas</h4>
-                           <p className="text-[9px] font-bold text-gray-400 mt-1 italic">Main page theme color</p>
-                        </div>
-                        <input type="color" className="w-14 h-14 rounded-2xl border-4 border-white shadow-lg cursor-pointer" value={profile.theme?.backgroundColor || '#fcfcfc'} onChange={(e) => setProfile({ ...profile, theme: { ...profile.theme, backgroundColor: e.target.value } })} />
+            {activeTab === 'theme' && (
+              <motion.div key="theme" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="max-w-2xl">
+                  <h2 className="text-[13px] font-black uppercase tracking-[0.45em] text-gray-500 mb-8">Page Skin Engine</h2>
+                  <div className="bg-[#111114] p-10 rounded-[3rem] border border-white/5 space-y-12">
+                     <div className="grid grid-cols-2 gap-10">
+                        <div className="space-y-4"><h4 className="text-[10px] font-black uppercase tracking-widest">Base Canvas</h4><input type="color" className="w-full h-16 rounded-2xl cursor-pointer bg-transparent border-2 border-white/5 p-1" value={profile.theme?.backgroundColor || '#0a0a0c'} onChange={(e) => setProfile({...profile, theme: {...profile.theme, backgroundColor: e.target.value }})} /></div>
+                        <div className="space-y-4"><h4 className="text-[10px] font-black uppercase tracking-widest">Hyper Accent</h4><input type="color" className="w-full h-16 rounded-2xl cursor-pointer bg-transparent border-2 border-white/5 p-1" value={profile.theme?.buttonColor || '#4f46e5'} onChange={(e) => setProfile({...profile, theme: {...profile.theme, buttonColor: e.target.value }})} /></div>
                      </div>
-                     <div className="flex items-center justify-between">
-                        <div>
-                           <h4 className="text-[11px] font-black uppercase tracking-widest text-gray-900">Hyper Buttons</h4>
-                           <p className="text-[9px] font-bold text-gray-400 mt-1 italic">Clickable element colors</p>
-                        </div>
-                        <input type="color" className="w-14 h-14 rounded-2xl border-4 border-white shadow-lg cursor-pointer" value={profile.theme?.buttonColor || '#4f46e5'} onChange={(e) => setProfile({ ...profile, theme: { ...profile.theme, buttonColor: e.target.value } })} />
-                     </div>
+                     <button onClick={handleUpdateProfile} className="w-full bg-indigo-600 p-5 rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-xl shadow-indigo-600/20">Update Atmosphere</button>
                   </div>
-                  <button onClick={handleUpdateProfile} className="w-full bg-indigo-600 text-white font-black uppercase text-[12px] p-5 rounded-[2rem] shadow-xl shadow-indigo-100">Apply New Theme</button>
-               </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'analytics' && (
-            <motion.div key="analytics" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                <h2 className="text-[12px] font-black uppercase tracking-[0.4em] text-gray-400 mb-6 pl-1">Performance Details</h2>
-                <div className="space-y-4">
-                   {links.map(link => (
-                     <div key={link._id} className="bg-white p-6 rounded-[2.5rem] border border-gray-50 shadow-sm flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                           <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black italic">
-                              {link.title[0]}
-                           </div>
-                           <div>
-                              <h4 className="text-[11px] font-black uppercase tracking-tight text-gray-900">{link.title}</h4>
-                              <p className="text-[9px] font-bold text-gray-300 truncate w-32">{link.url}</p>
-                           </div>
-                        </div>
-                        <div className="flex items-center space-x-6 pr-2 font-black italic">
-                            <div className="text-center">
-                               <p className="text-xs text-indigo-600 leading-none">{link.clickCount || 0}</p>
-                               <span className="text-[7px] uppercase tracking-widest text-gray-300">Clicks</span>
-                            </div>
-                            <div className="text-center">
-                               <p className="text-xs text-purple-600 leading-none">{link.shareCount || 0}</p>
-                               <span className="text-[7px] uppercase tracking-widest text-gray-300">Shares</span>
-                            </div>
-                        </div>
-                     </div>
-                   ))}
-                </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+         </AnimatePresence>
       </main>
 
-      {/* MOBILE MODAL FORM */}
+      {/* MOBILE NAV (BOTTOM) */}
+      <nav className="md:hidden fixed bottom-6 left-6 right-6 z-[1000] bg-[#111114]/90 backdrop-blur-3xl rounded-[2.5rem] border border-white/5 p-3 flex justify-around shadow-2xl">
+         {[ { id: 'links', icon: Layout }, { id: 'profile', icon: UserIcon }, { id: 'theme', icon: Palette } ].map(tab => (
+           <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`p-4 rounded-full transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20' : 'text-gray-600'}`}><tab.icon size={22} /></button>
+         ))}
+      </nav>
+
+      {/* OVERLAY FORM */}
       <AnimatePresence>
         {showForm && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-end p-4">
-             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="bg-white w-full rounded-[3rem] p-8 max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-8">
-                   <h3 className="text-xl font-black uppercase italic italic">{editingLink ? 'Refine Link' : 'New Masterpiece'}</h3>
-                   <button onClick={() => { setShowForm(false); setEditingLink(null); }} className="w-10 h-10 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400"><X size={24} /></button>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-xl flex items-center justify-center p-6">
+             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-[#111114] w-full max-w-xl rounded-[4rem] p-12 border border-white/10 relative overflow-hidden shadow-[0_0_100px_rgba(79,70,229,0.2)]">
+                <button onClick={() => setShowForm(false)} className="absolute top-10 right-10 text-gray-500 hover:text-white transition-colors"><X size={28} /></button>
+                <div className="mb-12 text-center">
+                   <h3 className="text-3xl font-black uppercase italic tracking-tighter">{editingLink ? 'Refine Objective' : 'New Content Protocol'}</h3>
+                   <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-700 mt-3">vth_internal access only</p>
                 </div>
-                <form onSubmit={handleCreateOrUpdateLink} className="space-y-6 pb-6">
+                <form onSubmit={handleCreateOrUpdateLink} className="space-y-6">
                    <div className="space-y-4">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase tracking-widest text-gray-300 ml-1">Content Title</label>
-                        <input className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold" placeholder="e.g. My Latest Short" value={linkForm.title} onChange={(e) => setLinkForm({...linkForm, title: e.target.value})} required/>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black uppercase tracking-widest text-gray-300 ml-1">Destination URL</label>
-                        <input className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold" placeholder="https://..." value={linkForm.url} onChange={(e) => setLinkForm({...linkForm, url: e.target.value})} required/>
-                      </div>
+                      <input className="w-full bg-[#0a0a0c] border border-white/5 p-5 rounded-3xl outline-none focus:border-indigo-500 font-bold transition-all" placeholder="Content Label" value={linkForm.title} onChange={(e) => setLinkForm({...linkForm, title: e.target.value})} required/>
+                      <input className="w-full bg-[#0a0a0c] border border-white/5 p-5 rounded-3xl outline-none focus:border-indigo-500 font-bold transition-all" placeholder="Entry URL (https://...)" value={linkForm.url} onChange={(e) => setLinkForm({...linkForm, url: e.target.value})} required/>
                       <div className="grid grid-cols-2 gap-4">
-                         <div className="space-y-1">
-                           <label className="text-[9px] font-black uppercase tracking-widest text-gray-300 ml-1">Content Type</label>
-                           <select className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold appearance-none" value={linkForm.type} onChange={(e) => setLinkForm({...linkForm, type: e.target.value})}>
-                              <option value="link">General Nav</option>
-                              <option value="video">YouTube Video</option>
-                           </select>
-                         </div>
-                         <div className="space-y-1">
-                           <label className="text-[9px] font-black uppercase tracking-widest text-gray-300 ml-1">Status</label>
-                           <select className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold appearance-none" value={linkForm.status} onChange={(e) => setLinkForm({...linkForm, status: e.target.value})}>
-                              <option value="published">Active</option>
-                              <option value="draft">Draft (Hidden)</option>
-                           </select>
-                         </div>
+                         <select className="w-full bg-[#0a0a0c] border border-white/5 p-5 rounded-3xl outline-none focus:border-indigo-500 font-black text-[10px] uppercase tracking-widest text-gray-500" value={linkForm.type} onChange={(e) => setLinkForm({...linkForm, type: e.target.value})}>
+                            <option value="link">General Navigate</option><option value="video">YouTube Engine</option>
+                         </select>
+                         <select className="w-full bg-[#0a0a0c] border border-white/5 p-5 rounded-3xl outline-none focus:border-indigo-500 font-black text-[10px] uppercase tracking-widest text-indigo-500" value={linkForm.status} onChange={(e) => setLinkForm({...linkForm, status: e.target.value})}>
+                            <option value="published">ACTIVE STATUS</option><option value="draft">STAGED / HIDDEN</option>
+                         </select>
                       </div>
                    </div>
-
-                   <div className="p-6 bg-indigo-50/50 rounded-[2rem] border border-indigo-100 space-y-6">
-                      <div className="flex items-center space-x-2 text-indigo-600">
-                         <Zap size={14} /> <span className="text-[9px] font-black uppercase tracking-[0.3em]">Schedule Engine</span>
+                   <div className="p-8 bg-indigo-600/5 rounded-[3rem] border border-indigo-600/10 space-y-6">
+                      <div className="flex items-center space-x-3 text-indigo-500"><Zap size={14} fill="currentColor" /> <span className="text-[10px] font-black uppercase tracking-[0.5em]">Scheduling Engine</span></div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div className="space-y-1.5"><label className="text-[9px] font-black uppercase text-gray-600 ml-1 tracking-widest">Boot Protocol</label><input className="w-full p-4 bg-[#0a0a0c] border border-white/5 rounded-2xl font-bold text-xs" type="datetime-local" value={linkForm.startDate ? new Date(linkForm.startDate).toISOString().slice(0, 16) : ''} onChange={(e) => setLinkForm({...linkForm, startDate: e.target.value})}/></div>
+                         <div className="space-y-1.5"><label className="text-[9px] font-black uppercase text-gray-600 ml-1 tracking-widest">Eject Protocol</label><input className="w-full p-4 bg-[#0a0a0c] border border-white/5 rounded-2xl font-bold text-xs text-red-500" type="datetime-local" value={linkForm.expiryDate ? new Date(linkForm.expiryDate).toISOString().slice(0, 16) : ''} onChange={(e) => setLinkForm({...linkForm, expiryDate: e.target.value})}/></div>
                       </div>
-                      <div className="grid grid-cols-1 gap-6">
-                         <div className="space-y-1">
-                            <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-1">Promotion Start</label>
-                            <input className="w-full p-3 bg-white border-2 border-indigo-100 rounded-xl outline-none font-bold text-xs" type="datetime-local" value={linkForm.startDate ? new Date(linkForm.startDate).toISOString().slice(0, 16) : ''} onChange={(e) => setLinkForm({...linkForm, startDate: e.target.value})}/>
-                         </div>
-                         <div className="space-y-1">
-                            <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-1">Promotion End (Archive)</label>
-                            <input className="w-full p-3 bg-white border-2 border-red-50 rounded-xl outline-none font-bold text-xs text-red-500" type="datetime-local" value={linkForm.expiryDate ? new Date(linkForm.expiryDate).toISOString().slice(0, 16) : ''} onChange={(e) => setLinkForm({...linkForm, expiryDate: e.target.value})}/>
-                         </div>
-                      </div>
-                      <button type="button" onClick={() => setLinkForm({...linkForm, startDate: null, expiryDate: null, status: 'published'})} className="text-[10px] font-black text-indigo-600 uppercase w-full">Fast Sync: Clear & Publish Now</button>
                    </div>
-
-                   <button className="w-full bg-indigo-600 text-white font-black uppercase text-[12px] p-5 rounded-[2rem] shadow-xl shadow-indigo-100 transition-all active:scale-95">
-                      {editingLink ? 'Save Changes' : 'Launch Content'}
-                   </button>
+                   <button className="w-full bg-indigo-600 p-6 rounded-[3rem] font-black uppercase text-xs tracking-widest shadow-2xl shadow-indigo-600/20 active:scale-95 transition-all">Launch Transmission</button>
                 </form>
              </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* FAB - ADD BUTTON */}
-      <button 
-        onClick={() => { setEditingLink(null); setLinkForm({ title: '', url: '', buttonText: 'Visit', status: 'published', type: 'link', startDate: null, expiryDate: null }); setShowForm(true); }}
-        className="fixed bottom-28 right-6 w-16 h-16 bg-white rounded-full shadow-[0_20px_50px_rgba(79,70,229,0.3)] shadow-indigo-100 flex items-center justify-center text-indigo-600 z-[900] border-4 border-indigo-50/50 hover:scale-110 active:scale-90 transition-all animate-pulse"
-      >
-        <Plus size={32} />
-      </button>
-
-      {/* PREMIUM BOTTOM NAV */}
-      <nav className="fixed bottom-6 left-6 right-6 z-[1000] bg-white/90 backdrop-blur-2xl rounded-[2.5rem] border border-gray-100 shadow-2xl shadow-indigo-100/50 flex items-center justify-around p-3">
-         {[
-           { id: 'links', icon: LayoutDashboard, label: 'Feed' },
-           { id: 'profile', icon: UserIcon, label: 'Bio' },
-           { id: 'theme', icon: Palette, label: 'Skin' },
-           { id: 'analytics', icon: LineChart, label: 'Data' }
-         ].map(tab => (
-           <button
-             key={tab.id}
-             onClick={() => setActiveTab(tab.id)}
-             className={`flex flex-col items-center p-3 rounded-[1.5rem] transition-all relative ${activeTab === tab.id ? 'text-indigo-600' : 'text-gray-300'}`}
-           >
-              <tab.icon size={22} fill={activeTab === tab.id ? 'currentColor' : 'transparent'} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
-              <span className={`text-[8px] font-black uppercase tracking-[0.2em] mt-1.5 ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'}`}>{tab.label}</span>
-              {activeTab === tab.id && <motion.div layoutId="nav-bg" className="absolute -inset-0 bg-indigo-50/50 rounded-3xl -z-10" />}
-           </button>
-         ))}
-      </nav>
 
     </div>
   );

@@ -81,7 +81,10 @@ exports.getPublicProfileLinks = async (req, res) => {
     const user = await User.findOne({ username: req.params.username });
     if (!user) return res.status(404).json({ message: 'Profile not found' });
 
-    const links = await Link.find({ adminId: user._id, status: 'published' }).sort('order');
+    const links = await Link.find({ 
+      adminId: user._id, 
+      $or: [{ status: 'published' }, { status: { $exists: false } }] 
+    }).sort('-createdAt');
     res.json({ profile: user, links });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -95,7 +98,10 @@ exports.getPersonalProfile = async (req, res) => {
     const user = await User.findOne();
     if (!user) return res.status(404).json({ message: 'Profile not found' });
 
-    const links = await Link.find({ adminId: user._id, status: 'published' }).sort('order');
+    const links = await Link.find({ 
+      adminId: user._id, 
+      $or: [{ status: 'published' }, { status: { $exists: false } }] 
+    }).sort('-createdAt');
     res.json({ profile: user, links });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -113,5 +119,25 @@ exports.recordShare = async (req, res) => {
     res.json({ message: 'Share recorded' });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+exports.subscribe = async (req, res) => {
+  try {
+    const Lead = require('../models/Lead');
+    await Lead.findOneAndUpdate({ email: req.body.email }, { email: req.body.email }, { upsert: true });
+    res.json({ message: 'Success' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error' });
+  }
+};
+
+exports.getLeads = async (req, res) => {
+  try {
+    const Lead = require('../models/Lead');
+    const leads = await Lead.find().sort('-createdAt');
+    res.json(leads);
+  } catch (error) {
+    res.status(500).json({ message: 'Error' });
   }
 };
