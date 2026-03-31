@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api'
+  baseURL: 'https://grow-vth-nani.onrender.com'
 });
 
 api.interceptors.request.use((config) => {
