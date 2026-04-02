@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { ExternalLink, Instagram, PlayCircle, Youtube, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ExternalLink, Instagram, PlayCircle, Share2, Youtube, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const Landing = () => {
@@ -65,11 +65,29 @@ const Landing = () => {
     } catch (err) { console.error('Profile fetch failed'); } finally { setLoading(false); }
   };
 
-  const handleLinkClick = async (linkId, url) => {
+  const handleLinkClick = (linkId, url) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    if (linkId) {
+      api.get(`/public/link/${linkId}/click`).catch(() => {});
+    }
+  };
+
+  const handleShareClick = async (e, link) => {
+    e.stopPropagation();
     try {
-      if (linkId) await api.get(`/public/link/${linkId}/click`);
-      window.open(url, '_blank');
-    } catch (err) { window.open(url, '_blank'); }
+      if (link._id) {
+        api.get(`/public/link/${link._id}/share`).catch(() => {});
+      }
+
+      if (navigator.share) {
+        await navigator.share({ title: link.title, url: link.url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(link.url);
+        alert('Link copied. You can share it now.');
+      } else {
+        window.prompt('Copy and share this link:', link.url);
+      }
+    } catch (_) {}
   };
 
   const getYTEmbedUrl = (url) => {
@@ -96,13 +114,24 @@ const Landing = () => {
   );
 
   // 🛠️ Robust Display Profile with real fallbacks
+  const rawSocialLinks = profile?.socialLinks || {};
+  const safeSocialLinks = {
+    instagram: rawSocialLinks.instagram?.includes('instagram.com')
+      ? rawSocialLinks.instagram
+      : 'https://instagram.com/grow_vth_nani',
+    youtube:
+      (rawSocialLinks.youtube?.includes('youtube.com') || rawSocialLinks.youtube?.includes('youtu.be'))
+        ? rawSocialLinks.youtube
+        : 'https://youtube.com/@grow_vth_nani',
+  };
+
   const displayProfile = {
     creatorName:
       (profile?.creatorName && String(profile.creatorName).trim()) ? String(profile.creatorName).trim() : 'grow_vth_nani',
     bio:
       (profile?.bio && String(profile.bio).trim()) ? String(profile.bio).trim() : 'Plan Today , Build Today , Launch Today Repeat',
     profilePicture: profile?.profilePicture,
-    socialLinks: profile?.socialLinks || { youtube: 'https://youtube.com/@grow_vth_nani', instagram: 'https://instagram.com/grow_vth_nani' }
+    socialLinks: safeSocialLinks,
   };
 
   const sortedLinks = [...links].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -343,7 +372,17 @@ const Landing = () => {
                 <span className="font-extrabold text-[15px] tracking-tight text-gray-950 line-clamp-1">
                   {link.title}
                 </span>
-                <ExternalLink size={18} className="text-pink-400" />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => handleShareClick(e, link)}
+                    className="w-9 h-9 rounded-xl border border-pink-100 bg-white/90 flex items-center justify-center text-pink-500 hover:bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                    aria-label={`Share ${link.title}`}
+                  >
+                    <Share2 size={16} />
+                  </button>
+                  <ExternalLink size={18} className="text-pink-400" />
+                </div>
               </motion.button>
             ))
           ) : (
