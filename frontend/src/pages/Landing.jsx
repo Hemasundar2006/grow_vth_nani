@@ -65,11 +65,17 @@ const Landing = () => {
     } catch (err) { console.error('Profile fetch failed'); } finally { setLoading(false); }
   };
 
-  const handleLinkClick = (linkId, url) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
-    if (linkId) {
-      api.get(`/public/link/${linkId}/click`).catch(() => {});
+  const getShareableUrl = (link) => {
+    if (link?._id) {
+      return `${api.defaults.baseURL}/public/s/${link._id}`;
     }
+    return link?.url || '';
+  };
+
+  const handleLinkClick = (link) => {
+    const targetUrl = getShareableUrl(link);
+    if (!targetUrl) return;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleShareClick = async (e, link) => {
@@ -79,13 +85,15 @@ const Landing = () => {
         api.get(`/public/link/${link._id}/share`).catch(() => {});
       }
 
+      const shareUrl = getShareableUrl(link);
+
       if (navigator.share) {
-        await navigator.share({ title: link.title, url: link.url });
+        await navigator.share({ title: link.title, url: shareUrl });
       } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(link.url);
+        await navigator.clipboard.writeText(shareUrl);
         alert('Link copied. You can share it now.');
       } else {
-        window.prompt('Copy and share this link:', link.url);
+        window.prompt('Copy and share this link:', shareUrl);
       }
     } catch (_) {}
   };
@@ -362,16 +370,22 @@ const Landing = () => {
         <motion.section className="space-y-3" variants={fadeUp}>
           {topLinks.length > 0 ? (
             topLinks.map((link) => (
-              <motion.button
+              <motion.div
                 key={link._id || link.title}
-                onClick={() => handleLinkClick(link._id, link.url)}
-                className="w-full bg-white/90 backdrop-blur border border-pink-100 px-5 py-4 rounded-[1.6rem] flex items-center justify-between hover:border-pink-200 hover:-translate-y-[1px] transition-all shadow-[0_18px_40px_-24px_rgba(236,72,153,0.30)] focus:outline-none focus:ring-2 focus:ring-pink-400"
+                className="w-full bg-white/90 backdrop-blur border border-pink-100 px-3 py-3 rounded-[1.6rem] flex items-center justify-between gap-2 hover:border-pink-200 hover:-translate-y-[1px] transition-all shadow-[0_18px_40px_-24px_rgba(236,72,153,0.30)]"
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <span className="font-extrabold text-[15px] tracking-tight text-gray-950 line-clamp-1">
-                  {link.title}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => handleLinkClick(link)}
+                  className="flex-1 text-left px-2 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  aria-label={`Open ${link.title}`}
+                >
+                  <span className="font-extrabold text-[15px] tracking-tight text-gray-950 line-clamp-1">
+                    {link.title}
+                  </span>
+                </button>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -383,7 +397,7 @@ const Landing = () => {
                   </button>
                   <ExternalLink size={18} className="text-pink-400" />
                 </div>
-              </motion.button>
+              </motion.div>
             ))
           ) : (
             <div className="py-12 border-2 border-dashed border-pink-100 rounded-[2rem] text-center bg-white/60">

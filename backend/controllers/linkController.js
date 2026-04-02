@@ -122,6 +122,21 @@ exports.recordShare = async (req, res) => {
   }
 };
 
+// Redirect by link id (for shareable tracked links)
+exports.redirectByLinkId = async (req, res) => {
+  try {
+    const link = await Link.findById(req.params.id);
+    if (!link) return res.status(404).json({ message: 'Link not found' });
+
+    link.clickCount = (link.clickCount || 0) + 1;
+    await link.save();
+
+    return res.redirect(link.url);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 exports.subscribe = async (req, res) => {
   try {
     const Lead = require('../models/Lead');

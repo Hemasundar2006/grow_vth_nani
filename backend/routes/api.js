@@ -8,6 +8,7 @@ const {
   deleteLink,
   recordClick,
   recordShare,
+  redirectByLinkId,
   getPublicProfileLinks,
   getPersonalProfile,
   subscribe,
@@ -39,6 +40,7 @@ router.get('/public/personal', getPersonalProfile);
 router.get('/public/profile/:username', getPublicProfileLinks);
 router.get('/public/link/:id/click', recordClick);
 router.get('/public/link/:id/share', recordShare);
+router.get('/public/s/:id', redirectByLinkId);
 router.post('/public/subscribe', subscribe);
 router.get('/admin/leads', protect, getLeads);
 
