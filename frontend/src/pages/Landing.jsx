@@ -1,24 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Instagram, Youtube, ExternalLink, Share2, PlayCircle, Zap, TrendingUp, Users, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ExternalLink, Instagram, PlayCircle, Youtube, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const Landing = () => {
   const [profile, setProfile] = useState(null);
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const [currentLinkPage, setCurrentLinkPage] = useState(1);
-  
-  const linksPerPage = 6;
+  const [showPromo, setShowPromo] = useState(true);
   const navigate = useNavigate();
+
+  const fadeUp = {
+    hidden: { opacity: 0, y: 12 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: 'easeOut' } },
+  };
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+  };
 
   const handleNextVideo = (total) => setCurrentVideoIndex((prev) => (prev + 1) % total);
   const handlePrevVideo = (total) => setCurrentVideoIndex((prev) => (prev - 1 + total) % total);
 
   useEffect(() => {
     fetchPersonalData();
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setShowPromo(false), 8000);
+    return () => clearTimeout(t);
   }, []);
 
   const fetchPersonalData = async () => {
@@ -59,20 +72,21 @@ const Landing = () => {
     } catch (err) { window.open(url, '_blank'); }
   };
 
-  const handleShareClick = async (e, link) => {
-    e.stopPropagation();
-    try {
-      if (link._id) await api.get(`/public/link/${link._id}/share`);
-      if (navigator.share) { await navigator.share({ title: link.title, url: link.url }); } 
-      else { await navigator.clipboard.writeText(link.url); alert('Link copied!'); }
-    } catch (err) { console.error('Sharing failed', err); }
-  };
-
   const getYTEmbedUrl = (url) => {
-    const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) 
-      ? `https://www.youtube.com/embed/${match[2]}?autoplay=1&mute=1&loop=1&playlist=${match[2]}` : null;
+    if (!url) return null;
+
+    // Supports common YouTube URL formats admins paste:
+    // - youtube.com/watch?v=VIDEOID
+    // - youtu.be/VIDEOID
+    // - youtube.com/embed/VIDEOID
+    // - youtube.com/shorts/VIDEOID
+    // - youtube.com/live/VIDEOID
+    const regExp = /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/))([A-Za-z0-9_-]{11})/;
+    const match = String(url).match(regExp);
+    if (!match?.[1]) return null;
+
+    const videoId = match[1];
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&playsinline=1`;
   };
 
   if (loading) return (
@@ -83,8 +97,10 @@ const Landing = () => {
 
   // 🛠️ Robust Display Profile with real fallbacks
   const displayProfile = {
-    creatorName: profile?.creatorName || 'grow_vth_nani',
-    bio: profile?.bio || 'Plan Today , Build Today , Launch Today Repeat',
+    creatorName:
+      (profile?.creatorName && String(profile.creatorName).trim()) ? String(profile.creatorName).trim() : 'grow_vth_nani',
+    bio:
+      (profile?.bio && String(profile.bio).trim()) ? String(profile.bio).trim() : 'Plan Today , Build Today , Launch Today Repeat',
     profilePicture: profile?.profilePicture,
     socialLinks: profile?.socialLinks || { youtube: 'https://youtube.com/@grow_vth_nani', instagram: 'https://instagram.com/grow_vth_nani' }
   };
@@ -98,108 +114,308 @@ const Landing = () => {
     return true;
   });
 
-  const videoLinks = activeLinks.filter(l => l.type === 'video');
-  const generalLinks = activeLinks.filter(l => l.type !== 'video');
-  const paginatedLinks = generalLinks.slice((currentLinkPage - 1) * linksPerPage, currentLinkPage * linksPerPage);
+  // Only treat as "video" if we can actually build an iframe.
+  // Otherwise, show it as a normal external link button.
+  const videoLinks = activeLinks.filter(l => l.type === 'video' && getYTEmbedUrl(l.url));
+  const topLinks = activeLinks.filter(link => !(link.type === 'video' && getYTEmbedUrl(link.url))).slice(0, 6);
+
+  const currentVideo = videoLinks[currentVideoIndex];
+  const currentVideoEmbedUrl = currentVideo ? getYTEmbedUrl(currentVideo.url) : null;
 
   return (
-    <div className="min-h-screen w-full bg-[#f8fafe] flex flex-col items-center selection:bg-indigo-600 selection:text-white p-0 sm:p-10 font-inter scroll-smooth">
-      
-      {/* BRAND MASTER HEADER */}
-      <header className="sticky top-4 z-[1000] w-full max-w-sm bg-white/95 backdrop-blur-2xl border border-gray-100 px-6 py-5 flex items-center justify-between shadow-[0_20px_40px_-10px_rgba(0,0,0,0.05)] rounded-[2.5rem] mb-10 border-b-indigo-100">
-        <div className="flex items-center space-x-3.5">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200/50 transform -rotate-2">
-            <Zap size={20} className="text-white" fill="white" />
-          </div>
-          <div>
-            <span className="font-extrabold text-sm uppercase tracking-tighter italic text-gray-950 leading-none">{displayProfile.creatorName}</span>
-            <div className="flex items-center space-x-1.5 mt-0.5 animate-pulse">
-              <div className="w-1 h-1 bg-green-500 rounded-full shadow-green-500/50"></div>
-              <span className="text-[9px] font-bold uppercase text-indigo-400 tracking-widest italic text-center">Protocol Active</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center space-x-4">
-           <a href={displayProfile.socialLinks?.instagram} target="_blank" rel="noreferrer" className="p-2.5 bg-gray-50 rounded-xl hover:text-indigo-600 hover:bg-white transition-all shadow-sm border border-gray-100"><Instagram size={18} /></a>
-           <a href={displayProfile.socialLinks?.youtube} target="_blank" rel="noreferrer" className="p-2.5 bg-gray-50 rounded-xl hover:text-indigo-600 hover:bg-white transition-all shadow-sm border border-gray-100"><Youtube size={18} /></a>
-        </div>
-      </header>
+    <div className="min-h-screen w-full bg-gradient-to-b from-[#fff1f6] via-[#fff7fb] to-[#ffffff] flex flex-col items-center selection:bg-pink-600 selection:text-white px-5 py-8 font-inter scroll-smooth">
+      <motion.div
+        className="w-full max-w-sm space-y-6"
+        variants={container}
+        initial="hidden"
+        animate="show"
+      >
+        {/* Floating promo (no layout space) */}
+        <AnimatePresence>
+          {showPromo && (displayProfile.socialLinks?.youtube || displayProfile.socialLinks?.instagram) && (
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center px-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              onClick={() => setShowPromo(false)}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Promotion"
+            >
+              {/* backdrop (clicking empty space closes) */}
+              <div className="absolute inset-0 bg-black/25 backdrop-blur-sm" />
 
-      {/* MOBILE CONTAINER FRAME */}
-      <div className="w-full max-w-sm bg-white rounded-[4rem] shadow-[0_48px_96px_-24px_rgba(0,10,30,0.2)] relative flex flex-col border border-gray-100/50 mb-20">
-        
-        {/* PROFILE SECTION */}
-        <div className="flex flex-col items-center pt-16 pb-12 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-56 bg-gradient-to-b from-indigo-50/80 via-indigo-50/20 to-transparent"></div>
-          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative mb-10 z-10">
-            <div className="w-44 h-44 rounded-full ring-[18px] ring-white shadow-2xl relative overflow-hidden group border border-gray-100">
-               <div className="w-full h-full rounded-full bg-gray-50 flex items-center justify-center">
-                  {displayProfile.profilePicture ? ( <img src={displayProfile.profilePicture} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="PFP" /> ) : (
-                    <img src={`https://unavatar.io/youtube/${displayProfile.creatorName || 'grow_vth_nani'}`} className="w-full h-full object-cover" alt="YT" />
-                  )}
-               </div>
-               <div className="absolute top-2 right-2 bg-white p-3.5 rounded-full shadow-xl border border-gray-50"><TrendingUp size={24} className="text-indigo-600" /></div>
-            </div>
-          </motion.div>
-          <div className="text-center px-10 z-10 flex flex-col items-center">
-             {/* ✅ SHOWING PROFILE NAME */}
-             <h1 className="text-[48px] font-black uppercase tracking-tighter italic text-gray-950 leading-none mb-6">{displayProfile.creatorName}</h1>
-             {/* ✅ SHOWING CAPTION (BIO) */}
-             <p className="text-[14px] font-bold text-slate-700 mb-12 px-6 leading-relaxed max-w-[340px] text-center lowercase opacity-90">{displayProfile.bio}</p>
-             <div className="inline-flex items-center bg-indigo-600 px-10 py-4 rounded-2xl shadow-2xl shadow-indigo-200/60 space-x-3 border-[6px] border-white ring-1 ring-gray-100 animate-slide-up">
-                <Zap size={14} className="text-white animate-pulse" fill="currentColor" />
-                <span className="text-xs font-black uppercase tracking-[0.25em] text-white">Verified Partner</span>
-             </div>
-          </div>
-        </div>
-
-        <div className="px-8 space-y-20 pb-28 relative">
-            {/* MISSION CONTROLS (LINKS) */}
-            <section>
-              <h2 className="text-[12px] font-black uppercase tracking-[0.45em] text-slate-400 mb-12 flex items-center pl-1"><Globe size={20} className="mr-5 text-indigo-500" /> Mission Controls</h2>
-              {paginatedLinks.length > 0 ? (
-                <div className="space-y-7">
-                  {paginatedLinks.map((link) => (
-                    <button key={link._id || link.title} onClick={() => handleLinkClick(link._id, link.url)} className="w-full group bg-white border border-gray-100 p-8 rounded-[3.5rem] shadow-sm hover:shadow-[0_40px_80px_-20px_rgba(79,70,229,0.18)] hover:-translate-y-3 transition-all flex items-center justify-between relative overflow-hidden">
-                      <div className="flex items-center space-x-7">
-                        <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center text-gray-950 group-hover:bg-indigo-600 group-hover:text-white transition-all transform group-hover:rotate-6 shadow-sm"><ExternalLink size={32} /></div>
-                        <span className="font-black text-xl uppercase tracking-tighter text-gray-950 text-left line-clamp-1 italic">{link.title}</span>
-                      </div>
-                      <div onClick={(e) => handleShareClick(e, link)} className="p-4 text-gray-300 hover:text-indigo-600 transition-all"><Share2 size={26} /></div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-24 border-2 border-dashed border-gray-100 rounded-[4rem] text-center"><p className="text-[12px] font-black text-gray-200 uppercase tracking-[0.5em] italic">No Mission Protocols Detected</p></div>
-              )}
-            </section>
-
-            {/* LATEST INSIGHTS (VIDEOS) */}
-            {videoLinks.length > 0 && (
-              <section>
-                 <h2 className="text-[12px] font-black uppercase tracking-[0.45em] text-slate-400 mb-12 flex items-center pl-1"><PlayCircle size={20} className="mr-5 text-red-500" /> Latest Insights</h2>
-                 <div className="relative group p-1 bg-white rounded-[3.1rem] border border-gray-100 shadow-[0_60px_100px_-20px_rgba(0,0,0,0.12)] overflow-hidden">
-                    <div className="aspect-video bg-black rounded-[3rem] overflow-hidden relative z-0">
-                      {getYTEmbedUrl(videoLinks[currentVideoIndex].url) && <iframe key={currentVideoIndex} width="100%" height="100%" src={getYTEmbedUrl(videoLinks[currentVideoIndex].url)} frameBorder="0" allowFullScreen className="w-full h-full" />}
+              <motion.div
+                className="relative w-full max-w-sm rounded-[1.8rem] border border-pink-100 bg-gradient-to-br from-white/95 via-white/85 to-[#fff1f6] p-5 text-left shadow-[0_26px_70px_-30px_rgba(236,72,153,0.45)]"
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{
+                  opacity: 1,
+                  y: [0, -3, 0],
+                  scale: 1,
+                  boxShadow: [
+                    '0 22px 60px -32px rgba(236,72,153,0.32)',
+                    '0 30px 78px -30px rgba(236,72,153,0.55)',
+                    '0 22px 60px -32px rgba(236,72,153,0.32)'
+                  ]
+                }}
+                exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                transition={{
+                  opacity: { duration: 0.2, ease: 'easeOut' },
+                  y: { duration: 2.6, repeat: Infinity, ease: 'easeInOut' },
+                  boxShadow: { duration: 2.6, repeat: Infinity, ease: 'easeInOut' },
+                  scale: { duration: 0.2, ease: 'easeOut' }
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowPromo(false)}
+                  className="absolute top-3 right-3 w-10 h-10 rounded-2xl border border-pink-100 bg-white/80 flex items-center justify-center text-pink-500 hover:bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  aria-label="Close"
+                >
+                  <X size={18} />
+                </button>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl overflow-hidden border border-pink-100 bg-[#fff7fb] shrink-0">
+                      <img
+                        src={
+                          displayProfile.profilePicture
+                            ? displayProfile.profilePicture
+                            : `https://unavatar.io/youtube/${displayProfile.creatorName || 'grow_vth_nani'}`
+                        }
+                        className="w-full h-full object-cover"
+                        alt="Profile"
+                      />
                     </div>
-                    <div className="absolute inset-y-0 left-4 flex items-center z-10"><button onClick={() => handlePrevVideo(videoLinks.length)} className="w-14 h-14 bg-white/40 backdrop-blur-xl text-white rounded-2xl flex items-center justify-center active:scale-90 transition-all font-black hover:bg-white/60 border border-white/20"><ChevronLeft size={28} /></button></div>
-                    <div className="absolute inset-y-0 right-4 flex items-center z-10"><button onClick={() => handleNextVideo(videoLinks.length)} className="w-14 h-14 bg-white/40 backdrop-blur-xl text-white rounded-2xl flex items-center justify-center active:scale-90 transition-all font-black hover:bg-white/60 border border-white/20"><ChevronRight size={28} /></button></div>
-                 </div>
-              </section>
-            )}
-          
-            {/* BRAND PILLARS */}
-            <div className="grid grid-cols-3 gap-6 pt-6 pb-6">
-              {[ { icon: Zap, label: 'Speed' }, { icon: TrendingUp, label: 'Growth' }, { icon: Users, label: 'Social' } ].map((p, i) => (
-                <div key={i} className="bg-white border border-gray-100 px-4 py-10 rounded-[3rem] flex flex-col items-center shadow-xl shadow-gray-100/30"><p.icon size={36} className="text-indigo-600 mb-5" /><span className="text-[13px] font-black uppercase tracking-[0.25em] text-slate-400">{p.label}</span></div>
-              ))}
-            </div>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-black text-gray-950 truncate">Quick support</p>
+                      <p className="text-[11px] font-semibold text-gray-600">
+                        Subscribe & follow in <span className="font-black text-pink-600">only 3 seconds</span>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-            <footer className="pt-28 pb-12 flex flex-col items-center border-t border-gray-50">
-              <button onClick={() => navigate('/login')} className="flex items-center space-x-5 text-xs font-black uppercase text-slate-300 hover:text-indigo-600 hover:scale-110 transition-all tracking-[0.5em]"><Zap size={24} className="mb-0.5" /> <span>Powered by vth_nani ecosystem</span></button>
-            </footer>
-        </div>
-      </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {displayProfile.socialLinks?.youtube ? (
+                    <motion.a
+                      href={displayProfile.socialLinks.youtube}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight bg-pink-600 text-white hover:bg-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                      whileHover={{ y: -1 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Youtube size={16} />
+                      Subscribe
+                    </motion.a>
+                  ) : (
+                    <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight bg-gray-100 text-gray-400">
+                      <Youtube size={16} />
+                      Subscribe
+                    </div>
+                  )}
+
+                  {displayProfile.socialLinks?.instagram ? (
+                    <motion.a
+                      href={displayProfile.socialLinks.instagram}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight border border-pink-200 bg-white text-pink-600 hover:bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                      whileHover={{ y: -1 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Instagram size={16} />
+                      Follow
+                    </motion.a>
+                  ) : (
+                    <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight border border-gray-200 bg-gray-50 text-gray-400">
+                      <Instagram size={16} />
+                      Follow
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Header */}
+        <motion.header className="sticky top-3 z-10" variants={fadeUp}>
+          <div className="bg-white/80 backdrop-blur border border-pink-100 rounded-[1.6rem] px-4 py-3 shadow-[0_18px_50px_-28px_rgba(236,72,153,0.35)] flex items-center justify-between">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.35em] text-pink-300">Link in bio</p>
+              <p className="text-sm font-extrabold text-gray-950 truncate">{displayProfile.creatorName}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <motion.a
+                href={displayProfile.socialLinks?.instagram}
+                target="_blank"
+                rel="noreferrer"
+                className="w-10 h-10 rounded-xl border border-pink-100 bg-white/70 flex items-center justify-center text-pink-500 hover:bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
+                aria-label="Open Instagram"
+                whileHover={{ y: -1, scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
+              >
+                <Instagram size={18} />
+              </motion.a>
+              <motion.a
+                href={displayProfile.socialLinks?.youtube}
+                target="_blank"
+                rel="noreferrer"
+                className="w-10 h-10 rounded-xl border border-pink-100 bg-white/70 flex items-center justify-center text-pink-500 hover:bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
+                aria-label="Open YouTube"
+                whileHover={{ y: -1, scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
+              >
+                <Youtube size={18} />
+              </motion.a>
+            </div>
+          </div>
+        </motion.header>
+
+        {/* Profile */}
+        <motion.div className="bg-white/90 backdrop-blur rounded-[2.5rem] border border-pink-100 p-8 flex flex-col items-center text-center shadow-[0_24px_60px_-24px_rgba(236,72,153,0.35)] text-gray-900" variants={fadeUp}>
+          <div className="w-28 h-28 rounded-full overflow-hidden ring-[14px] ring-white bg-[#fff7fb] shadow-lg border border-pink-100 relative">
+            <img
+              src={
+                displayProfile.profilePicture
+                  ? displayProfile.profilePicture
+                  : `https://unavatar.io/youtube/${displayProfile.creatorName || 'grow_vth_nani'}`
+              }
+              className="w-full h-full object-cover"
+              alt="Profile"
+            />
+          </div>
+
+          <h1 className="mt-6 text-[40px] font-black tracking-tight text-gray-950 leading-none">
+            {displayProfile.creatorName}
+          </h1>
+          <p className="mt-3 text-[14px] font-semibold text-gray-700 px-2 leading-relaxed opacity-100">
+            {displayProfile.bio}
+          </p>
+          <div className="mt-5 flex items-center justify-center gap-3">
+            {displayProfile.socialLinks?.instagram && (
+              <motion.a
+                href={displayProfile.socialLinks.instagram}
+                target="_blank"
+                rel="noreferrer"
+                className="w-11 h-11 rounded-2xl border border-pink-100 bg-white/80 flex items-center justify-center text-pink-500 hover:bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
+                aria-label="Instagram"
+                whileHover={{ y: -1, scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
+              >
+                <Instagram size={20} />
+              </motion.a>
+            )}
+            {displayProfile.socialLinks?.youtube && (
+              <motion.a
+                href={displayProfile.socialLinks.youtube}
+                target="_blank"
+                rel="noreferrer"
+                className="w-11 h-11 rounded-2xl border border-pink-100 bg-white/80 flex items-center justify-center text-pink-500 hover:bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
+                aria-label="YouTube"
+                whileHover={{ y: -1, scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
+              >
+                <Youtube size={20} />
+              </motion.a>
+            )}
+          </div>
+
+          <div className="mt-5 h-px w-full bg-gradient-to-r from-transparent via-pink-100 to-transparent" />
+        </motion.div>
+
+        {/* Top links */}
+        <motion.section className="space-y-3" variants={fadeUp}>
+          {topLinks.length > 0 ? (
+            topLinks.map((link) => (
+              <motion.button
+                key={link._id || link.title}
+                onClick={() => handleLinkClick(link._id, link.url)}
+                className="w-full bg-white/90 backdrop-blur border border-pink-100 px-5 py-4 rounded-[1.6rem] flex items-center justify-between hover:border-pink-200 hover:-translate-y-[1px] transition-all shadow-[0_18px_40px_-24px_rgba(236,72,153,0.30)] focus:outline-none focus:ring-2 focus:ring-pink-400"
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <span className="font-extrabold text-[15px] tracking-tight text-gray-950 line-clamp-1">
+                  {link.title}
+                </span>
+                <ExternalLink size={18} className="text-pink-400" />
+              </motion.button>
+            ))
+          ) : (
+            <div className="py-12 border-2 border-dashed border-pink-100 rounded-[2rem] text-center bg-white/60">
+              <p className="text-[11px] font-black text-pink-200 uppercase tracking-[0.5em]">
+                No Links Found
+              </p>
+            </div>
+          )}
+        </motion.section>
+
+        {/* YouTube section (9:16) */}
+        {videoLinks.length > 0 && currentVideoEmbedUrl && (
+          <motion.section className="space-y-4" variants={fadeUp}>
+            <h2 className="text-[11px] font-black uppercase tracking-[0.45em] text-pink-300 flex items-center justify-center">
+              <PlayCircle size={18} className="mr-3 text-pink-500" /> YouTube
+            </h2>
+
+            <motion.div
+              className="relative bg-white/90 backdrop-blur p-2 rounded-[2rem] border border-pink-100 shadow-[0_24px_60px_-24px_rgba(236,72,153,0.35)] overflow-hidden"
+              whileHover={{ y: -1 }}
+            >
+              <div className="aspect-[9/16] bg-black rounded-[1.6rem] overflow-hidden relative">
+                <iframe
+                  key={currentVideo?._id || currentVideoIndex}
+                  width="100%"
+                  height="100%"
+                  src={currentVideoEmbedUrl}
+                  frameBorder="0"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+
+                {videoLinks.length > 1 && (
+                  <>
+                    <div className="absolute inset-y-0 left-2 flex items-center">
+                      <button
+                        onClick={() => handlePrevVideo(videoLinks.length)}
+                        className="w-10 h-10 bg-white/50 backdrop-blur-xl text-white rounded-2xl flex items-center justify-center active:scale-90 transition-all font-black hover:bg-white/70 border border-white/20 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                        aria-label="Previous video"
+                      >
+                        <ChevronLeft size={22} />
+                      </button>
+                    </div>
+                    <div className="absolute inset-y-0 right-2 flex items-center">
+                      <button
+                        onClick={() => handleNextVideo(videoLinks.length)}
+                        className="w-10 h-10 bg-white/50 backdrop-blur-xl text-white rounded-2xl flex items-center justify-center active:scale-90 transition-all font-black hover:bg-white/70 border border-white/20 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                        aria-label="Next video"
+                      >
+                        <ChevronRight size={22} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.section>
+        )}
+
+        {/* Footer (below YouTube) */}
+        <motion.footer className="pt-6 pb-2 flex flex-col items-center border-t border-pink-100" variants={fadeUp}>
+          <motion.button
+            onClick={() => navigate('/login')}
+            className="flex items-center space-x-3 text-xs font-black uppercase text-pink-300 hover:text-pink-600 hover:scale-105 transition-all tracking-[0.25em] focus:outline-none focus:ring-2 focus:ring-pink-400 rounded-lg px-2 py-1"
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <span>Powered by Grow_vth_nani</span>
+          </motion.button>
+        </motion.footer>
+      </motion.div>
     </div>
   );
 };
