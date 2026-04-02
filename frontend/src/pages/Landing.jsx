@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { ExternalLink, Instagram, PlayCircle, Share2, Youtube, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ExternalLink, Instagram, PlayCircle, Youtube, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const Landing = () => {
@@ -65,37 +65,18 @@ const Landing = () => {
     } catch (err) { console.error('Profile fetch failed'); } finally { setLoading(false); }
   };
 
-  const getShareableUrl = (link) => {
-    if (link?._id) {
-      return `${api.defaults.baseURL}/public/s/${link._id}`;
+  const normalizeExternalUrl = (url) => {
+    if (!url) return '';
+    const trimmed = String(url).trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const handleLinkClick = (linkId) => {
+    if (linkId) {
+      api.get(`/public/link/${linkId}/click`).catch(() => {});
     }
-    return link?.url || '';
-  };
-
-  const handleLinkClick = (link) => {
-    const targetUrl = getShareableUrl(link);
-    if (!targetUrl) return;
-    window.open(targetUrl, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleShareClick = async (e, link) => {
-    e.stopPropagation();
-    try {
-      if (link._id) {
-        api.get(`/public/link/${link._id}/share`).catch(() => {});
-      }
-
-      const shareUrl = getShareableUrl(link);
-
-      if (navigator.share) {
-        await navigator.share({ title: link.title, url: shareUrl });
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareUrl);
-        alert('Link copied. You can share it now.');
-      } else {
-        window.prompt('Copy and share this link:', shareUrl);
-      }
-    } catch (_) {}
   };
 
   const getYTEmbedUrl = (url) => {
@@ -376,25 +357,19 @@ const Landing = () => {
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <button
-                  type="button"
-                  onClick={() => handleLinkClick(link)}
+                <a
+                  href={normalizeExternalUrl(link.url)}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => handleLinkClick(link?._id)}
                   className="flex-1 text-left px-2 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
                   aria-label={`Open ${link.title}`}
                 >
                   <span className="font-extrabold text-[15px] tracking-tight text-gray-950 line-clamp-1">
                     {link.title}
                   </span>
-                </button>
+                </a>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => handleShareClick(e, link)}
-                    className="w-9 h-9 rounded-xl border border-pink-100 bg-white/90 flex items-center justify-center text-pink-500 hover:bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                    aria-label={`Share ${link.title}`}
-                  >
-                    <Share2 size={16} />
-                  </button>
                   <ExternalLink size={18} className="text-pink-400" />
                 </div>
               </motion.div>

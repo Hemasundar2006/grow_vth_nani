@@ -1,13 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import { ExternalLink, Eye, LogOut, Pencil, Plus, Save, Search, Trash2 } from 'lucide-react';
+import { BarChart3, CalendarClock, ExternalLink, Eye, LogOut, Pencil, Plus, Save, Search, Trash2 } from 'lucide-react';
 
 const AdminDashboard = () => {
   const [links, setLinks] = useState([]);
   const [profile, setProfile] = useState({});
-  const [activeTab, setActiveTab] = useState('links'); // 'links' | 'profile'
+  const [activeTab, setActiveTab] = useState('links'); // 'links' | 'scheduler' | 'analytics' | 'profile'
   const [loading, setLoading] = useState(true);
   const [editingLink, setEditingLink] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -15,6 +15,8 @@ const AdminDashboard = () => {
   const [filterType, setFilterType] = useState('all'); // all | link | video
   
   const navigate = useNavigate();
+  const linkFormSectionRef = useRef(null);
+  const linkTitleInputRef = useRef(null);
 
   const [linkForm, setLinkForm] = useState({
     title: '',
@@ -109,6 +111,45 @@ const AdminDashboard = () => {
     });
   }, [sortedLinks, searchQuery, filterStatus, filterType]);
 
+  const getScheduleState = (link) => {
+    const now = new Date();
+    const start = link?.startDate ? new Date(link.startDate) : null;
+    const end = link?.expiryDate ? new Date(link.expiryDate) : null;
+    if (start && start > now) return 'upcoming';
+    if (end && end < now) return 'expired';
+    return 'live';
+  };
+
+  const schedulerBuckets = useMemo(() => {
+    const buckets = { upcoming: [], live: [], expired: [] };
+    for (const link of sortedLinks) {
+      buckets[getScheduleState(link)].push(link);
+    }
+    return buckets;
+  }, [sortedLinks]);
+
+  const analytics = useMemo(() => {
+    const totals = sortedLinks.reduce(
+      (acc, link) => {
+        acc.clicks += link.clickCount || 0;
+        acc.shares += link.shareCount || 0;
+        acc.published += (link.status || 'published') === 'published' ? 1 : 0;
+        acc.draft += (link.status || 'published') === 'draft' ? 1 : 0;
+        return acc;
+      },
+      { clicks: 0, shares: 0, published: 0, draft: 0 }
+    );
+
+    const topByClicks = [...sortedLinks]
+      .sort((a, b) => (b.clickCount || 0) - (a.clickCount || 0))
+      .slice(0, 5);
+    const topByShares = [...sortedLinks]
+      .sort((a, b) => (b.shareCount || 0) - (a.shareCount || 0))
+      .slice(0, 5);
+
+    return { totals, topByClicks, topByShares };
+  }, [sortedLinks]);
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0c] text-white font-inter">
       <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" aria-label="Loading" />
@@ -129,6 +170,12 @@ const AdminDashboard = () => {
       type: link.type || 'link',
       startDate: link.startDate ? new Date(link.startDate).toISOString().slice(0, 16) : '',
       expiryDate: link.expiryDate ? new Date(link.expiryDate).toISOString().slice(0, 16) : '',
+    });
+
+    // On mobile the form may be out of view; bring it into focus.
+    requestAnimationFrame(() => {
+      linkFormSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => linkTitleInputRef.current?.focus(), 250);
     });
   };
 
@@ -169,6 +216,8 @@ const AdminDashboard = () => {
           <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1">
             {[
               { id: 'links', label: 'Links' },
+              { id: 'scheduler', label: 'Scheduler' },
+              { id: 'analytics', label: 'Analytics' },
               { id: 'profile', label: 'Profile' },
             ].map((t) => (
               <button
@@ -190,7 +239,7 @@ const AdminDashboard = () => {
         {activeTab === 'links' && (
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             {/* Form */}
-            <section className="lg:col-span-2 bg-[#111114] border border-white/10 rounded-2xl p-5 sm:p-6">
+            <section ref={linkFormSectionRef} className="lg:col-span-2 bg-[#111114] border border-white/10 rounded-2xl p-5 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-black uppercase tracking-widest text-gray-300">
                   {editingLink ? 'Edit link' : 'Add link'}
@@ -212,6 +261,7 @@ const AdminDashboard = () => {
                   </label>
                   <input
                     id="link-title"
+                    ref={linkTitleInputRef}
                     className="mt-2 w-full rounded-xl bg-[#0a0a0c] border border-white/10 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500"
                     value={linkForm.title}
                     onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })}
@@ -432,6 +482,123 @@ const AdminDashboard = () => {
               </div>
             </section>
           </div>
+        )}
+
+        {activeTab === 'scheduler' && (
+          <section className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-[#111114] border border-white/10 rounded-2xl p-5">
+                <p className="text-xs uppercase tracking-widest font-black text-gray-400">Upcoming</p>
+                <p className="mt-2 text-3xl font-black">{schedulerBuckets.upcoming.length}</p>
+              </div>
+              <div className="bg-[#111114] border border-white/10 rounded-2xl p-5">
+                <p className="text-xs uppercase tracking-widest font-black text-gray-400">Live</p>
+                <p className="mt-2 text-3xl font-black">{schedulerBuckets.live.length}</p>
+              </div>
+              <div className="bg-[#111114] border border-white/10 rounded-2xl p-5">
+                <p className="text-xs uppercase tracking-widest font-black text-gray-400">Expired</p>
+                <p className="mt-2 text-3xl font-black">{schedulerBuckets.expired.length}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {[
+                { key: 'upcoming', title: 'Upcoming', color: 'text-amber-200 bg-amber-500/10 border-amber-500/20' },
+                { key: 'live', title: 'Live', color: 'text-emerald-200 bg-emerald-500/10 border-emerald-500/20' },
+                { key: 'expired', title: 'Expired', color: 'text-rose-200 bg-rose-500/10 border-rose-500/20' },
+              ].map((bucket) => (
+                <div key={bucket.key} className="bg-[#111114] border border-white/10 rounded-2xl p-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-gray-300">{bucket.title}</h3>
+                    <span className={`text-[10px] font-black px-2 py-1 rounded-full border ${bucket.color}`}>
+                      {schedulerBuckets[bucket.key].length}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {schedulerBuckets[bucket.key].slice(0, 6).map((link) => (
+                      <button
+                        key={link._id}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('links');
+                          beginEdit(link);
+                        }}
+                        className="w-full text-left rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <p className="text-sm font-bold truncate">{link.title}</p>
+                        <p className="text-[11px] text-gray-400 mt-1 truncate">
+                          Start: {link.startDate ? new Date(link.startDate).toLocaleString() : 'Immediate'}
+                        </p>
+                        <p className="text-[11px] text-gray-400 truncate">
+                          End: {link.expiryDate ? new Date(link.expiryDate).toLocaleString() : 'No expiry'}
+                        </p>
+                      </button>
+                    ))}
+                    {schedulerBuckets[bucket.key].length === 0 && (
+                      <p className="text-xs text-gray-500">No links in this bucket.</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'analytics' && (
+          <section className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-[#111114] border border-white/10 rounded-2xl p-5">
+                <p className="text-xs uppercase tracking-widest font-black text-gray-400">Total clicks</p>
+                <p className="mt-2 text-3xl font-black">{analytics.totals.clicks}</p>
+              </div>
+              <div className="bg-[#111114] border border-white/10 rounded-2xl p-5">
+                <p className="text-xs uppercase tracking-widest font-black text-gray-400">Total shares</p>
+                <p className="mt-2 text-3xl font-black">{analytics.totals.shares}</p>
+              </div>
+              <div className="bg-[#111114] border border-white/10 rounded-2xl p-5">
+                <p className="text-xs uppercase tracking-widest font-black text-gray-400">Published</p>
+                <p className="mt-2 text-3xl font-black">{analytics.totals.published}</p>
+              </div>
+              <div className="bg-[#111114] border border-white/10 rounded-2xl p-5">
+                <p className="text-xs uppercase tracking-widest font-black text-gray-400">Draft</p>
+                <p className="mt-2 text-3xl font-black">{analytics.totals.draft}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-[#111114] border border-white/10 rounded-2xl p-5">
+                <div className="flex items-center gap-2">
+                  <BarChart3 size={16} className="text-indigo-300" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-gray-300">Top by clicks</h3>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {analytics.topByClicks.map((link) => (
+                    <div key={link._id} className="flex items-center justify-between border border-white/10 rounded-xl p-3 bg-white/5">
+                      <p className="text-sm font-bold truncate pr-3">{link.title}</p>
+                      <span className="text-xs font-black text-gray-300">{link.clickCount || 0}</span>
+                    </div>
+                  ))}
+                  {analytics.topByClicks.length === 0 && <p className="text-xs text-gray-500">No data yet.</p>}
+                </div>
+              </div>
+
+              <div className="bg-[#111114] border border-white/10 rounded-2xl p-5">
+                <div className="flex items-center gap-2">
+                  <CalendarClock size={16} className="text-indigo-300" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-gray-300">Top by shares</h3>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {analytics.topByShares.map((link) => (
+                    <div key={link._id} className="flex items-center justify-between border border-white/10 rounded-xl p-3 bg-white/5">
+                      <p className="text-sm font-bold truncate pr-3">{link.title}</p>
+                      <span className="text-xs font-black text-gray-300">{link.shareCount || 0}</span>
+                    </div>
+                  ))}
+                  {analytics.topByShares.length === 0 && <p className="text-xs text-gray-500">No data yet.</p>}
+                </div>
+              </div>
+            </div>
+          </section>
         )}
 
         {activeTab === 'profile' && (
