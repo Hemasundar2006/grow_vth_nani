@@ -168,7 +168,7 @@ const Landing = () => {
 
   /** Fire-and-forget click count — does not block opening the destination */
   const pingLinkClick = (linkId) => {
-    if (!linkId) return;
+    if (linkId == null || linkId === '') return;
     const id = String(linkId);
     const url = `${API_BASE.replace(/\/$/, '')}/public/link/${encodeURIComponent(id)}/click`;
     void fetch(url, {
@@ -179,11 +179,31 @@ const Landing = () => {
     }).catch(() => {});
   };
 
-  /** Opens in a new tab; avoids cases where motion/drag or empty href blocks navigation */
-  const openRowUrl = (link) => {
+  /**
+   * Opens in a new tab from the same user gesture (works better than window.open with pop-up blockers).
+   * `showToast` — brief confirmation for trending / when you want visible feedback.
+   */
+  const openRowUrl = (link, { showToast = false } = {}) => {
     const href = normalizeExternalUrl(link?.url);
-    if (!href) return;
-    window.open(href, '_blank', 'noopener,noreferrer');
+    if (!href) {
+      toast.error('This link has no URL set. Add one in the admin.');
+      return;
+    }
+    try {
+      const a = document.createElement('a');
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (showToast) {
+        toast.success('Opening link in a new tab…', { duration: 2000, id: 'landing-open-link' });
+      }
+    } catch {
+      toast.error("Couldn't open this link. Allow pop-ups for this site or try another browser.");
+    }
     queueMicrotask(() => pingLinkClick(link?._id));
   };
 
@@ -534,6 +554,7 @@ const Landing = () => {
                     <button
                       type="button"
                       aria-label="Previous trending link"
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={() =>
                         setTrendingSlide((s) => (s - 1 + trendingLinksSorted.length) % trendingLinksSorted.length)
                       }
@@ -544,6 +565,7 @@ const Landing = () => {
                     <button
                       type="button"
                       aria-label="Next trending link"
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={() => setTrendingSlide((s) => (s + 1) % trendingLinksSorted.length)}
                       className="absolute right-0 top-1/2 z-10 -translate-y-1/2 w-9 h-9 rounded-xl border border-pink-100 bg-white/95 flex items-center justify-center text-pink-500 shadow-sm active:scale-95 focus:outline-none focus:ring-2 focus:ring-pink-400"
                     >
@@ -562,7 +584,8 @@ const Landing = () => {
                   >
                     <button
                       type="button"
-                      onClick={() => openRowUrl(trendingLinksSorted[trendingSlide])}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => openRowUrl(trendingLinksSorted[trendingSlide], { showToast: true })}
                       className="min-w-0 flex-1 rounded-xl px-1 py-1 text-left focus:outline-none focus:ring-2 focus:ring-pink-400"
                       aria-label={`Open ${trendingLinksSorted[trendingSlide]?.title ?? 'link'}`}
                     >
@@ -575,7 +598,8 @@ const Landing = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => openRowUrl(trendingLinksSorted[trendingSlide])}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => openRowUrl(trendingLinksSorted[trendingSlide], { showToast: true })}
                       className="shrink-0 rounded-xl p-2 text-pink-400 hover:bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-400"
                       aria-label="Open link"
                     >
@@ -592,6 +616,7 @@ const Landing = () => {
                       type="button"
                       role="tab"
                       aria-selected={i === trendingSlide}
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={() => setTrendingSlide(i)}
                       className={`h-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-pink-400 ${
                         i === trendingSlide ? 'w-6 bg-pink-500' : 'w-1.5 bg-pink-200'
