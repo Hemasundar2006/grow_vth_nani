@@ -23,6 +23,7 @@ const AdminDashboard = () => {
     url: '',
     status: 'published',
     type: 'link',
+    category: 'useful',
     startDate: '',
     expiryDate: ''
   });
@@ -61,7 +62,7 @@ const AdminDashboard = () => {
         toast.success('Link created');
       }
       setEditingLink(null);
-      setLinkForm({ title: '', url: '', status: 'published', type: 'link', startDate: '', expiryDate: '' });
+      setLinkForm({ title: '', url: '', status: 'published', type: 'link', category: 'useful', startDate: '', expiryDate: '' });
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Save failed');
@@ -156,9 +157,17 @@ const AdminDashboard = () => {
     </div>
   );
 
+  const normalizeCategory = (c) => {
+    const x = String(c || '').toLowerCase();
+    if (x === 'content') return 'content';
+    if (x === 'upcoming') return 'upcoming';
+    if (x === 'trending') return 'trending';
+    return 'useful';
+  };
+
   const beginCreate = () => {
     setEditingLink(null);
-    setLinkForm({ title: '', url: '', status: 'published', type: 'link', startDate: '', expiryDate: '' });
+    setLinkForm({ title: '', url: '', status: 'published', type: 'link', category: 'useful', startDate: '', expiryDate: '' });
   };
 
   const beginEdit = (link) => {
@@ -168,6 +177,7 @@ const AdminDashboard = () => {
       url: link.url || '',
       status: link.status || 'published',
       type: link.type || 'link',
+      category: normalizeCategory(link.category),
       startDate: link.startDate ? new Date(link.startDate).toISOString().slice(0, 16) : '',
       expiryDate: link.expiryDate ? new Date(link.expiryDate).toISOString().slice(0, 16) : '',
     });
@@ -285,7 +295,7 @@ const AdminDashboard = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label htmlFor="link-type" className="block text-xs font-black uppercase tracking-widest text-gray-400">
                       Type
@@ -298,6 +308,23 @@ const AdminDashboard = () => {
                     >
                       <option value="link">Link</option>
                       <option value="video">YouTube</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="link-category" className="block text-xs font-black uppercase tracking-widest text-gray-400">
+                      Category
+                    </label>
+                    <select
+                      id="link-category"
+                      className="mt-2 w-full rounded-xl bg-[#0a0a0c] border border-white/10 px-4 py-3 text-sm font-black outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={linkForm.category}
+                      onChange={(e) => setLinkForm({ ...linkForm, category: e.target.value })}
+                    >
+                      <option value="useful">Useful links</option>
+                      <option value="content">Content</option>
+                      <option value="upcoming">Upcoming</option>
+                      <option value="trending">Trending (pinned)</option>
                     </select>
                   </div>
 
@@ -438,6 +465,9 @@ const AdminDashboard = () => {
                           </span>
                           <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full border border-white/10 text-gray-200 bg-white/5">
                             {link.type || 'link'}
+                          </span>
+                          <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full border border-indigo-500/30 text-indigo-200 bg-indigo-500/10">
+                            {normalizeCategory(link.category)}
                           </span>
                         </div>
 

@@ -1,5 +1,15 @@
 const Link = require('../models/Link');
 
+const ALLOWED_CATEGORIES = Link.LINK_CATEGORY_VALUES || ['useful', 'content', 'upcoming', 'trending'];
+
+function normalizeCategory(category) {
+  if (category == null || category === '') return 'useful';
+  const x = String(category).toLowerCase().trim();
+  if (ALLOWED_CATEGORIES.includes(x)) return x;
+  if (x === 'general') return 'useful';
+  return null;
+}
+
 // Get all links for admin
 exports.getLinksByAdmin = async (req, res) => {
   try {
@@ -13,18 +23,25 @@ exports.getLinksByAdmin = async (req, res) => {
 // Create new link
 exports.createLink = async (req, res) => {
   try {
-    const { title, url, description, category, type, icon, status, buttonText, order, expiryDate } = req.body;
+    const { title, url, description, category, type, icon, status, buttonText, order, startDate, expiryDate } = req.body;
+    const normalizedCategory = normalizeCategory(category);
+    if (normalizedCategory === null) {
+      return res.status(400).json({
+        message: `Invalid category. Allowed: ${ALLOWED_CATEGORIES.join(', ')}`,
+      });
+    }
     const link = await Link.create({
       adminId: req.user.id,
       title,
       url,
       description,
-      category,
+      category: normalizedCategory,
       type,
       icon,
       status,
       buttonText,
       order,
+      startDate,
       expiryDate
     });
     res.status(201).json(link);
@@ -39,7 +56,17 @@ exports.updateLink = async (req, res) => {
     const link = await Link.findById(req.params.id);
     if (!link) return res.status(404).json({ message: 'Link not found' });
 
-    Object.assign(link, req.body);
+    const patch = { ...req.body };
+    if (Object.prototype.hasOwnProperty.call(patch, 'category')) {
+      const normalizedCategory = normalizeCategory(patch.category);
+      if (normalizedCategory === null) {
+        return res.status(400).json({
+          message: `Invalid category. Allowed: ${ALLOWED_CATEGORIES.join(', ')}`,
+        });
+      }
+      patch.category = normalizedCategory;
+    }
+    Object.assign(link, patch);
     const updatedLink = await link.save();
     res.json(updatedLink);
   } catch (error) {
