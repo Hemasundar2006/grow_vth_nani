@@ -24,7 +24,8 @@ const linkSchema = new mongoose.Schema({
   order: { type: Number, default: 0 }
 }, { timestamps: true });
 
-linkSchema.pre('validate', function coerceCategory(next) {
+// Mongoose 9+: no `next()` callback — use sync middleware or async/await
+linkSchema.pre('validate', function coerceCategory() {
   const raw = this.category;
   const x = String(raw == null ? 'useful' : raw).toLowerCase().trim();
   if (LINK_CATEGORY_VALUES.includes(x)) {
@@ -34,7 +35,6 @@ linkSchema.pre('validate', function coerceCategory(next) {
   } else {
     this.category = 'useful';
   }
-  next();
 });
 
 const Link = mongoose.model('Link', linkSchema);

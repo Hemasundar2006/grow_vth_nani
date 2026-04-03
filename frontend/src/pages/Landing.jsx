@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import api from '../services/api';
+import api, { API_BASE } from '../services/api';
 import { ExternalLink, Instagram, PlayCircle, Youtube, X, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -166,18 +166,25 @@ const Landing = () => {
     return `https://${trimmed}`;
   };
 
-  const handleLinkClick = (linkId) => {
-    if (linkId) {
-      api.get(`/public/link/${linkId}/click`).catch(() => {});
-    }
+  /** Fire-and-forget click count — does not block opening the destination */
+  const pingLinkClick = (linkId) => {
+    if (!linkId) return;
+    const id = String(linkId);
+    const url = `${API_BASE.replace(/\/$/, '')}/public/link/${encodeURIComponent(id)}/click`;
+    void fetch(url, {
+      method: 'GET',
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-store',
+    }).catch(() => {});
   };
 
   /** Opens in a new tab; avoids cases where motion/drag or empty href blocks navigation */
   const openRowUrl = (link) => {
     const href = normalizeExternalUrl(link?.url);
     if (!href) return;
-    handleLinkClick(link?._id);
     window.open(href, '_blank', 'noopener,noreferrer');
+    queueMicrotask(() => pingLinkClick(link?._id));
   };
 
   /** Upcoming: only opens at/after startDate; otherwise toast (or if no start date set). */
