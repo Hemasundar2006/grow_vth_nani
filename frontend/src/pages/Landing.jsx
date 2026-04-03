@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api, { API_BASE } from '../services/api';
@@ -99,14 +100,24 @@ const Landing = () => {
 
   const PAGE_SIZE = 6;
 
+  // pointerEvents: hidden rows must not steal taps (opacity:0 still blocks clicks by default)
   const fadeUp = {
-    hidden: { opacity: 0, y: 12 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: 'easeOut' } },
+    hidden: { opacity: 0, y: 12, pointerEvents: 'none' },
+    show: {
+      opacity: 1,
+      y: 0,
+      pointerEvents: 'auto',
+      transition: { duration: 0.45, ease: 'easeOut' },
+    },
   };
 
   const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+    hidden: { opacity: 0, pointerEvents: 'none' },
+    show: {
+      opacity: 1,
+      pointerEvents: 'auto',
+      transition: { staggerChildren: 0.08, delayChildren: 0.05 },
+    },
   };
 
   const handleNextVideo = (total) => setCurrentVideoIndex((prev) => (prev + 1) % total);
@@ -179,31 +190,20 @@ const Landing = () => {
     }).catch(() => {});
   };
 
-  /**
-   * Opens in a new tab from the same user gesture (works better than window.open with pop-up blockers).
-   * `showToast` — brief confirmation for trending / when you want visible feedback.
-   */
-  const openRowUrl = (link, { showToast = false } = {}) => {
+  /** After go-live, open without a real <a> (upcoming gated row). */
+  const openGraduatedUpcoming = (link) => {
     const href = normalizeExternalUrl(link?.url);
     if (!href) {
       toast.error('This link has no URL set. Add one in the admin.');
       return;
     }
-    try {
-      const a = document.createElement('a');
-      a.href = href;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      if (showToast) {
-        toast.success('Opening link in a new tab…', { duration: 2000, id: 'landing-open-link' });
-      }
-    } catch {
-      toast.error("Couldn't open this link. Allow pop-ups for this site or try another browser.");
-    }
+    const a = document.createElement('a');
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     queueMicrotask(() => pingLinkClick(link?._id));
   };
 
@@ -226,7 +226,7 @@ const Landing = () => {
       );
       return;
     }
-    openRowUrl(link);
+    openGraduatedUpcoming(link);
   };
 
   const buckets = useMemo(() => buildLandingBuckets(links), [links]);
@@ -299,10 +299,42 @@ const Landing = () => {
       const validStart = start && !Number.isNaN(start.getTime());
       const showStarts = showScheduledHint && validStart && start > now;
       const showMissingSchedule = Boolean(showScheduledHint && gateUpcoming && !validStart);
-      const onActivate = () => {
-        if (gateUpcoming) handleUpcomingClick(link);
-        else openRowUrl(link);
-      };
+      const hrefOpen = normalizeExternalUrl(link.url);
+
+      if (!gateUpcoming) {
+        return (
+          <motion.div
+            key={link._id || link.title}
+            className="w-full bg-white/90 backdrop-blur border border-pink-100 px-3 py-3 rounded-[1.6rem] flex items-stretch hover:border-pink-200 hover:-translate-y-[1px] transition-all shadow-[0_18px_40px_-24px_rgba(236,72,153,0.30)]"
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <a
+              href={hrefOpen || '#'}
+              target={hrefOpen ? '_blank' : undefined}
+              rel={hrefOpen ? 'noopener noreferrer' : undefined}
+              onClick={(e) => {
+                if (!hrefOpen) {
+                  e.preventDefault();
+                  toast.error('This link has no URL set. Add one in the admin.');
+                  return;
+                }
+                queueMicrotask(() => pingLinkClick(link?._id));
+              }}
+              className="flex flex-1 items-center gap-2 min-w-0 px-2 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 text-left"
+              aria-label={`Open ${link.title}`}
+            >
+              <span className="flex-1 min-w-0">
+                <span className="font-extrabold text-[15px] tracking-tight text-gray-950 line-clamp-1 block">
+                  {link.title}
+                </span>
+              </span>
+              <ExternalLink size={18} className="text-pink-400 shrink-0" aria-hidden />
+            </a>
+          </motion.div>
+        );
+      }
+
       return (
         <motion.div
           key={link._id || link.title}
@@ -311,15 +343,13 @@ const Landing = () => {
           whileTap={{ scale: 0.98 }}
         >
           <a
-            href={gateUpcoming ? '#' : normalizeExternalUrl(link.url) || '#'}
-            target={gateUpcoming ? undefined : '_blank'}
-            rel={gateUpcoming ? undefined : 'noreferrer'}
+            href="#"
             onClick={(e) => {
               e.preventDefault();
-              onActivate();
+              handleUpcomingClick(link);
             }}
             className="flex-1 text-left px-2 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-            aria-label={gateUpcoming ? `${link.title} (scheduled)` : `Open ${link.title}`}
+            aria-label={`${link.title} (scheduled)`}
           >
             <span className="font-extrabold text-[15px] tracking-tight text-gray-950 line-clamp-1">
               {link.title}
@@ -337,9 +367,9 @@ const Landing = () => {
           </a>
           <button
             type="button"
-            onClick={onActivate}
+            onClick={() => handleUpcomingClick(link)}
             className="shrink-0 rounded-xl p-1.5 text-pink-400 hover:bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-400"
-            aria-label={gateUpcoming ? `Details for ${link.title}` : `Open ${link.title}`}
+            aria-label={`Details for ${link.title}`}
           >
             <ExternalLink size={18} />
           </button>
@@ -353,125 +383,126 @@ const Landing = () => {
     </div>
   );
 
-  return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-[#fff1f6] via-[#fff7fb] to-[#ffffff] flex flex-col items-center selection:bg-pink-600 selection:text-white px-5 py-8 font-inter scroll-smooth">
+  const promoModal =
+    showPromo && (displayProfile.socialLinks?.youtube || displayProfile.socialLinks?.instagram) ? (
       <motion.div
-        className="w-full max-w-sm space-y-6"
-        variants={container}
-        initial="hidden"
-        animate="show"
+        key="landing-promo"
+        className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, pointerEvents: 'none' }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Promotion"
       >
-        {/* Floating promo (no layout space) */}
-        <AnimatePresence>
-          {showPromo && (displayProfile.socialLinks?.youtube || displayProfile.socialLinks?.instagram) && (
-            <motion.div
-              className="fixed inset-0 z-50 flex items-center justify-center px-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Promotion"
-            >
-              {/* Backdrop blocks stray taps from hitting the page; does not close the promo. */}
-              <div className="absolute inset-0 bg-black/25 backdrop-blur-sm" aria-hidden />
+        <div className="absolute inset-0 bg-black/25 backdrop-blur-sm" aria-hidden />
 
-              <motion.div
-                className="relative w-full max-w-sm rounded-[1.8rem] border border-pink-100 bg-gradient-to-br from-white/95 via-white/85 to-[#fff1f6] p-5 text-left shadow-[0_26px_70px_-30px_rgba(236,72,153,0.45)]"
-                initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                animate={{
-                  opacity: 1,
-                  y: [0, -3, 0],
-                  scale: 1,
-                  boxShadow: [
-                    '0 22px 60px -32px rgba(236,72,153,0.32)',
-                    '0 30px 78px -30px rgba(236,72,153,0.55)',
-                    '0 22px 60px -32px rgba(236,72,153,0.32)'
-                  ]
-                }}
-                exit={{ opacity: 0, y: 10, scale: 0.98 }}
-                transition={{
-                  opacity: { duration: 0.2, ease: 'easeOut' },
-                  y: { duration: 2.6, repeat: Infinity, ease: 'easeInOut' },
-                  boxShadow: { duration: 2.6, repeat: Infinity, ease: 'easeInOut' },
-                  scale: { duration: 0.2, ease: 'easeOut' }
-                }}
+        <motion.div
+          className="relative w-full max-w-sm rounded-[1.8rem] border border-pink-100 bg-gradient-to-br from-white/95 via-white/85 to-[#fff1f6] p-5 text-left shadow-[0_26px_70px_-30px_rgba(236,72,153,0.45)]"
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          animate={{
+            opacity: 1,
+            y: [0, -3, 0],
+            scale: 1,
+            boxShadow: [
+              '0 22px 60px -32px rgba(236,72,153,0.32)',
+              '0 30px 78px -30px rgba(236,72,153,0.55)',
+              '0 22px 60px -32px rgba(236,72,153,0.32)',
+            ],
+          }}
+          exit={{ opacity: 0, y: 10, scale: 0.98 }}
+          transition={{
+            opacity: { duration: 0.2, ease: 'easeOut' },
+            y: { duration: 2.6, repeat: Infinity, ease: 'easeInOut' },
+            boxShadow: { duration: 2.6, repeat: Infinity, ease: 'easeInOut' },
+            scale: { duration: 0.2, ease: 'easeOut' },
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setShowPromo(false)}
+            className="absolute top-3 right-3 w-10 h-10 rounded-2xl border border-pink-100 bg-white/80 flex items-center justify-center text-pink-500 hover:bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl overflow-hidden border border-pink-100 bg-[#fff7fb] shrink-0">
+                <img
+                  src={
+                    displayProfile.profilePicture
+                      ? displayProfile.profilePicture
+                      : `https://unavatar.io/youtube/${displayProfile.creatorName || 'grow_vth_nani'}`
+                  }
+                  className="w-full h-full object-cover"
+                  alt="Profile"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[12px] font-black text-gray-950 truncate">Quick support</p>
+                <p className="text-[11px] font-semibold text-gray-600">
+                  Subscribe & follow in <span className="font-black text-pink-600">only 3 seconds</span>.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            {displayProfile.socialLinks?.youtube ? (
+              <motion.a
+                href={displayProfile.socialLinks.youtube}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight bg-pink-600 text-white hover:bg-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <button
-                  type="button"
-                  onClick={() => setShowPromo(false)}
-                  className="absolute top-3 right-3 w-10 h-10 rounded-2xl border border-pink-100 bg-white/80 flex items-center justify-center text-pink-500 hover:bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
-                  aria-label="Close"
-                >
-                  <X size={18} />
-                </button>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl overflow-hidden border border-pink-100 bg-[#fff7fb] shrink-0">
-                      <img
-                        src={
-                          displayProfile.profilePicture
-                            ? displayProfile.profilePicture
-                            : `https://unavatar.io/youtube/${displayProfile.creatorName || 'grow_vth_nani'}`
-                        }
-                        className="w-full h-full object-cover"
-                        alt="Profile"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-black text-gray-950 truncate">Quick support</p>
-                      <p className="text-[11px] font-semibold text-gray-600">
-                        Subscribe & follow in <span className="font-black text-pink-600">only 3 seconds</span>.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <Youtube size={16} />
+                Subscribe
+              </motion.a>
+            ) : (
+              <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight bg-gray-100 text-gray-400">
+                <Youtube size={16} />
+                Subscribe
+              </div>
+            )}
 
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  {displayProfile.socialLinks?.youtube ? (
-                    <motion.a
-                      href={displayProfile.socialLinks.youtube}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight bg-pink-600 text-white hover:bg-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                      whileHover={{ y: -1 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Youtube size={16} />
-                      Subscribe
-                    </motion.a>
-                  ) : (
-                    <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight bg-gray-100 text-gray-400">
-                      <Youtube size={16} />
-                      Subscribe
-                    </div>
-                  )}
+            {displayProfile.socialLinks?.instagram ? (
+              <motion.a
+                href={displayProfile.socialLinks.instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight border border-pink-200 bg-white text-pink-600 hover:bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <Instagram size={16} />
+                Follow
+              </motion.a>
+            ) : (
+              <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight border border-gray-200 bg-gray-50 text-gray-400">
+                <Instagram size={16} />
+                Follow
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    ) : null;
 
-                  {displayProfile.socialLinks?.instagram ? (
-                    <motion.a
-                      href={displayProfile.socialLinks.instagram}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight border border-pink-200 bg-white text-pink-600 hover:bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                      whileHover={{ y: -1 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <Instagram size={16} />
-                      Follow
-                    </motion.a>
-                  ) : (
-                    <div className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-black tracking-tight border border-gray-200 bg-gray-50 text-gray-400">
-                      <Instagram size={16} />
-                      Follow
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+  return (
+    <>
+      {createPortal(<AnimatePresence>{promoModal}</AnimatePresence>, document.body)}
 
+      <div className="min-h-screen w-full bg-gradient-to-b from-[#fff1f6] via-[#fff7fb] to-[#ffffff] flex flex-col items-center selection:bg-pink-600 selection:text-white px-5 py-8 font-inter scroll-smooth">
+        <motion.div
+          className="w-full max-w-sm space-y-6"
+          variants={container}
+          initial="hidden"
+          animate="show"
+        >
         {/* Header */}
         <motion.header className="sticky top-3 z-10" variants={fadeUp}>
           <div className="bg-white/80 backdrop-blur border border-pink-100 rounded-[1.6rem] px-4 py-3 shadow-[0_18px_50px_-28px_rgba(236,72,153,0.35)] flex items-center justify-between">
@@ -531,30 +562,12 @@ const Landing = () => {
                   {now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                 </span>
               </div>
-              <motion.div
-                className="relative p-3 min-h-[4.25rem] flex items-center touch-pan-y"
-                drag={trendingLinksSorted.length >= 2 ? 'x' : false}
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.22}
-                dragDirectionLock
-                onDragEnd={(_, info) => {
-                  const n = trendingLinksSorted.length;
-                  if (n < 2) return;
-                  const { offset, velocity } = info;
-                  const t = 52;
-                  if (offset.x < -t || velocity.x < -380) {
-                    setTrendingSlide((s) => (s + 1) % n);
-                  } else if (offset.x > t || velocity.x > 380) {
-                    setTrendingSlide((s) => (s - 1 + n) % n);
-                  }
-                }}
-              >
+              <div className="relative p-3 min-h-[4.25rem] flex items-center">
                 {trendingLinksSorted.length >= 2 && (
                   <>
                     <button
                       type="button"
                       aria-label="Previous trending link"
-                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={() =>
                         setTrendingSlide((s) => (s - 1 + trendingLinksSorted.length) % trendingLinksSorted.length)
                       }
@@ -565,7 +578,6 @@ const Landing = () => {
                     <button
                       type="button"
                       aria-label="Next trending link"
-                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={() => setTrendingSlide((s) => (s + 1) % trendingLinksSorted.length)}
                       className="absolute right-0 top-1/2 z-10 -translate-y-1/2 w-9 h-9 rounded-xl border border-pink-100 bg-white/95 flex items-center justify-center text-pink-500 shadow-sm active:scale-95 focus:outline-none focus:ring-2 focus:ring-pink-400"
                     >
@@ -576,38 +588,52 @@ const Landing = () => {
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={trendingLinksSorted[trendingSlide]?._id || trendingSlide}
-                    initial={{ opacity: 0, x: 36 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -36 }}
+                    initial={{ opacity: 0, x: 36, pointerEvents: 'none' }}
+                    animate={{ opacity: 1, x: 0, pointerEvents: 'auto' }}
+                    exit={{ opacity: 0, x: -36, pointerEvents: 'none' }}
                     transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-                    className={`flex w-full items-center gap-3 ${trendingLinksSorted.length >= 2 ? 'px-9' : ''}`}
+                    className={`flex w-full items-stretch ${trendingLinksSorted.length >= 2 ? 'px-9' : ''}`}
                   >
-                    <button
-                      type="button"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={() => openRowUrl(trendingLinksSorted[trendingSlide], { showToast: true })}
-                      className="min-w-0 flex-1 rounded-xl px-1 py-1 text-left focus:outline-none focus:ring-2 focus:ring-pink-400"
-                      aria-label={`Open ${trendingLinksSorted[trendingSlide]?.title ?? 'link'}`}
-                    >
-                      <span className="font-extrabold text-[14px] leading-snug text-gray-950 line-clamp-2">
-                        {trendingLinksSorted[trendingSlide]?.title}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] font-semibold text-pink-500">
-                        {trendingLinksSorted.length >= 2 ? 'Swipe or tap to open' : 'Tap to open'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={() => openRowUrl(trendingLinksSorted[trendingSlide], { showToast: true })}
-                      className="shrink-0 rounded-xl p-2 text-pink-400 hover:bg-pink-50 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                      aria-label="Open link"
-                    >
-                      <ExternalLink size={20} />
-                    </button>
+                    {(() => {
+                      const tl = trendingLinksSorted[trendingSlide];
+                      const th = normalizeExternalUrl(tl?.url);
+                      return (
+                        <a
+                          href={th || '#'}
+                          target={th ? '_blank' : undefined}
+                          rel={th ? 'noopener noreferrer' : undefined}
+                          onClick={(e) => {
+                            if (!th) {
+                              e.preventDefault();
+                              toast.error('This link has no URL set. Add one in the admin.');
+                              return;
+                            }
+                            toast.success('Opening link in a new tab…', {
+                              duration: 2000,
+                              id: 'landing-open-link',
+                            });
+                            queueMicrotask(() => pingLinkClick(tl?._id));
+                          }}
+                          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1 py-1 text-left focus:outline-none focus:ring-2 focus:ring-pink-400"
+                          aria-label={`Open ${tl?.title ?? 'link'}`}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="font-extrabold text-[14px] leading-snug text-gray-950 line-clamp-2 block">
+                              {tl?.title}
+                            </span>
+                            <span className="mt-0.5 block text-[10px] font-semibold text-pink-500">
+                              {trendingLinksSorted.length >= 2
+                                ? 'Arrows or dots to browse · tap to open'
+                                : 'Tap to open'}
+                            </span>
+                          </span>
+                          <ExternalLink size={20} className="text-pink-400 shrink-0" aria-hidden />
+                        </a>
+                      );
+                    })()}
                   </motion.div>
                 </AnimatePresence>
-              </motion.div>
+              </div>
               {trendingLinksSorted.length > 1 && (
                 <div className="flex justify-center gap-1.5 pb-3" role="tablist" aria-label="Trending slides">
                   {trendingLinksSorted.map((l, i) => (
@@ -616,7 +642,6 @@ const Landing = () => {
                       type="button"
                       role="tab"
                       aria-selected={i === trendingSlide}
-                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={() => setTrendingSlide(i)}
                       className={`h-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-pink-400 ${
                         i === trendingSlide ? 'w-6 bg-pink-500' : 'w-1.5 bg-pink-200'
@@ -802,6 +827,7 @@ const Landing = () => {
         </motion.footer>
       </motion.div>
     </div>
+    </>
   );
 };
 
